@@ -4,43 +4,79 @@ import { env } from './index.js';
 /**
  * Multi-Tenant Database Connection Manager
  * Manages connections to organization-specific databases
+ * 
+ * Optimized for performance with:
+ * - Cached base URI computation
+ * - Connection pooling
+ * - Timeout and retry options
+ * - Efficient connection reuse
  */
 
 const connectionCache = new Map();
 
+// Cache base URI and query params once (avoid recomputation)
+let cachedBaseUri = null;
+let cachedQueryParams = null;
+
 const getBaseUri = () => {
+    if (cachedBaseUri !== null) {
+        return cachedBaseUri;
+    }
+
     const uri = env.MONGO_URI;
     const lastSlashIndex = uri.lastIndexOf('/');
     const queryIndex = uri.indexOf('?');
 
-    if (queryIndex !== -1 && queryIndex > lastSlashIndex) {
-        return uri.substring(0, lastSlashIndex + 1);
+    cachedBaseUri = uri.substring(0, lastSlashIndex + 1);
+    cachedQueryParams = queryIndex !== -1 ? uri.substring(queryIndex) : '';
+
+    return cachedBaseUri;
+};
+
+const getQueryParams = () => {
+    if (cachedQueryParams === null) {
+        getBaseUri(); // This will populate cachedQueryParams
     }
-    return uri.substring(0, lastSlashIndex + 1);
+    return cachedQueryParams;
+};
+
+// Connection options for optimal performance
+const connectionOptions = {
+    maxPoolSize: 50,          // Maximum connections in pool
+    minPoolSize: 5,           // Keep minimum connections ready
+    serverSelectionTimeoutMS: 5000,  // Timeout for server selection
+    socketTimeoutMS: 45000,   // Socket timeout
+    maxIdleTimeMS: 30000,     // Close idle connections after 30s
 };
 
 export const getOrganizationConnection = async (organizationName) => {
     if (!organizationName) {
         throw new Error('Organization name is required');
     }
+
     const dbName = organizationName;
-    if (connectionCache.has(dbName)) {
-        const cachedConnection = connectionCache.get(dbName);
+
+    // Fast path: return cached connection if ready
+    const cachedConnection = connectionCache.get(dbName);
+    if (cachedConnection) {
         if (cachedConnection.readyState === 1) {
             return cachedConnection;
         }
+        // Connection is stale, remove it
         connectionCache.delete(dbName);
     }
-    const baseUri = getBaseUri();
-    const orgUri = `${baseUri}${dbName}`;
 
-    const queryIndex = env.MONGO_URI.indexOf('?');
-    const queryParams = queryIndex !== -1 ? env.MONGO_URI.substring(queryIndex) : '';
-    const fullUri = `${orgUri}${queryParams}`;
+    // Build connection URI
+    const fullUri = `${getBaseUri()}${dbName}${getQueryParams()}`;
 
     try {
-        const connection = await mongoose.createConnection(fullUri).asPromise();
-        console.log(`Connected to organization database: ${dbName}`);
+        const connection = await mongoose.createConnection(fullUri, connectionOptions).asPromise();
+
+        // Only log in development to reduce I/O overhead
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`Connected to organization database: ${dbName}`);
+        }
+
         connectionCache.set(dbName, connection);
         return connection;
     } catch (error) {

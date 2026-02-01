@@ -17,7 +17,11 @@ const validateProject = [
     }
 ];
 
+// Project CRUD routes
 router.post('/', validateProject, projectController.addProject);
 router.get('/', projectController.getAllProjects);
+router.get('/:id', projectController.getProjectById);
+router.get('/:id/blocks', projectController.getProjectBlocks);
+router.put('/:id', projectController.updateProject);
 
 export default router;

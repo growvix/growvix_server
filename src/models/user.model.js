@@ -1,14 +1,26 @@
 import mongoose, { Schema } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import bcrypt from 'bcryptjs';
 
+/**
+ * Global User Schema - Used for users in the global admin database
+ * This is the source of truth for user structure
+ */
 const UserSchema = new Schema(
     {
         _id: {
             type: mongoose.Schema.Types.UUID,
             default: uuidv4
         },
-        organization: { type: String, required: true },
+        profile_id: {
+            type: Number,
+            unique: true,
+            index: true
+        },
+        globalUserId: {
+            type: mongoose.Schema.Types.UUID,
+            index: true
+        },
+        organization: { type: String, required: true, index: true },
         profile: {
             firstName: { type: String, required: true },
             lastName: { type: String, required: true },
@@ -16,8 +28,9 @@ const UserSchema = new Schema(
             phone: { type: String },
             profileImagePath: { type: String },
         },
-        password: { type: String, required: true, select: false }, // Store hashed password
+        password: { type: String, required: true, select: false },
         role: { type: String, enum: ['user', 'admin'], default: 'user' },
+        isActive: { type: Boolean, default: true },
     },
     {
         timestamps: true,

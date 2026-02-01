@@ -13,12 +13,13 @@ export class AuthController {
 
         // Flatten response as requested
         const responseData = {
-            uuid: result.uuid,
+            profile_id: result.profile_id,
             organization: result.organization,
             firstName: result.firstName,
             lastName: result.lastName,
             email: result.email,
-            token: result.token
+            token: result.token,
+            role: result.role
         };
 
         res.status(200).json(ApiResponse.success('Login successful', responseData));

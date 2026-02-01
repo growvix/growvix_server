@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 export const registerSchema = z.object({
     body: z.object({
-        phoneNumber: z.string().min(1, "Phone number is required"),
-        organizationId: z.string().min(1, "Organization ID is required"),
+        phoneNumber: z.string().optional(),
+        organization: z.string().min(1, "Organization is required"),
         profile: z.object({
             firstName: z.string().min(1, "First name is required"),
             lastName: z.string().min(1, "Last name is required"),

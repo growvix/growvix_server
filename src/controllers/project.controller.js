@@ -13,6 +13,27 @@ export class ProjectController {
         const projects = await projectService.getAllProjects(organization);
         res.status(200).json(ApiResponse.success('Projects fetched successfully', projects));
     });
+
+    getProjectById = asyncHandler(async (req, res) => {
+        const organization = req.query.organization;
+        const { id } = req.params;
+        const project = await projectService.getProjectById(organization, id);
+        res.status(200).json(ApiResponse.success('Project fetched successfully', project));
+    });
+
+    getProjectBlocks = asyncHandler(async (req, res) => {
+        const organization = req.query.organization;
+        const { id } = req.params;
+        const blocks = await projectService.getProjectBlocks(organization, id);
+        res.status(200).json(ApiResponse.success('Project blocks fetched successfully', blocks));
+    });
+
+    updateProject = asyncHandler(async (req, res) => {
+        const organization = req.query.organization || req.body.organization;
+        const { id } = req.params;
+        const project = await projectService.updateProject(organization, id, req.body);
+        res.status(200).json(ApiResponse.success('Project updated successfully', project));
+    });
 }
 
 export const projectController = new ProjectController();

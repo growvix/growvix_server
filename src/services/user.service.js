@@ -84,14 +84,31 @@ export class UserService {
      * Get all users from global database
      * Optionally filter by organization
      */
-    async getAllUsers(limit = 10, page = 1, organization = null) {
-        const skip = (page - 1) * limit;
+    async getAllUsers({ limit = 10, page = 1, organization = null } = {}) {
+        const safeLimit = Math.max(1, parseInt(limit, 10));
+        const safePage = Math.max(1, parseInt(page, 10));
+        const skip = (safePage - 1) * safeLimit;
+
         const query = organization ? { organization } : {};
 
-        const users = await User.find(query).skip(skip).limit(limit);
-        const total = await User.countDocuments(query);
-        return { users, total, page, limit };
+        const [users, total] = await Promise.all([
+            User.find(query)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(safeLimit)
+                .lean(), // returns plain JS objects (faster)
+            User.countDocuments(query)
+        ]);
+
+        return {
+            users,
+            total,
+            page: safePage,
+            limit: safeLimit,
+            totalPages: Math.ceil(total / safeLimit)
+        };
     }
+
 
     /**
      * Get users from a specific organization's database

@@ -4,8 +4,9 @@ import { AppError } from '../utils/apiResponse.util.js';
 import { hashPassword, comparePassword, signToken } from '../utils/security.util.js';
 const { getOrganizationConnection } = await import('../config/multiTenantDb.js');
 const { getClientUserModel } = await import('../models/clientUser.model.js');
+
 export class AuthService {
-    
+
     async register(data) {
         // Check if user exists by email (which is in profile.email)
         const email = data.profile?.email;
@@ -27,18 +28,23 @@ export class AuthService {
             data.password = await hashPassword(data.password);
         }
 
+        // Auto-generate sequential profile_id
+        const lastUser = await User.findOne().sort({ profile_id: -1 }).select('profile_id');
+        const nextProfileId = lastUser?.profile_id ? lastUser.profile_id + 1 : 1;
+        data.profile_id = nextProfileId;
+
         // Add to global_users (admin db)
         const user = await User.create(data);
         const token = signToken(user._id, user.role);
 
         // Add to organization users (client db)
         try {
-            
             const orgConn = await getOrganizationConnection(organization);
             const ClientUser = getClientUserModel(orgConn);
             // Prepare client user data
             const clientUserData = {
                 _id: user._id,
+                profile_id: user.profile_id,
                 globalUserId: user._id,
                 profile: user.profile,
                 role: user.role,
@@ -79,15 +85,16 @@ export class AuthService {
         const userObj = user.toObject();
         delete userObj.password;
 
-        // Return user data including organization for frontend
+        // Return user data with profile_id instead of uuid
         return {
             user: userObj,
             token,
-            uuid: user._id,
+            profile_id: user.profile_id,
             organization: user.organization,
             firstName: user.profile.firstName,
             lastName: user.profile.lastName,
-            email: user.profile.email
+            email: user.profile.email,
+            role: user.role
         };
     }
 }

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package lead;
+
+// Lead message representing a lead record
+message Lead {
+  int32 profile_id = 1;
+  string name = 2;
+  string campaign = 3;
+  string source = 4;
+  string sub_source = 5;
+  string received = 6;
+}
+
+// Request message for GetAllLeads
+message GetAllLeadsRequest {
+  string organization = 1;
+}
+
+// Response message for GetAllLeads
+message GetAllLeadsResponse {
+  repeated Lead leads = 1;
+}
+
+// Lead service definition
+service LeadService {
+  rpc GetAllLeads(GetAllLeadsRequest) returns (GetAllLeadsResponse);
+}

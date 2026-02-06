@@ -32,6 +32,7 @@ const LeadSchema = new Schema(
             created_at: { type: Date },
             medium: { type: String },
         }],
+        stage: { type: Number },
         created_at: { type: Date },
         updated_at: { type: Date },
     },

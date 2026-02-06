@@ -1,6 +1,7 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadModel } from '../models/lead.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
+import mongoose from 'mongoose';
 
 export class LeadService {
     async addLead(data) {
@@ -54,6 +55,69 @@ export class LeadService {
             });
         } catch (err) {
             throw new AppError('Failed to fetch leads: ' + err.message, 500);
+        }
+    }
+
+    async getLeadById(organization, id) {
+        if (!organization) {
+            throw new AppError('Organization is required', 400);
+        }
+        if (!id) {
+            throw new AppError('Lead ID is required', 400);
+        }
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            // Try to find by ObjectId first, then by profile_id
+            let lead;
+            if (mongoose.Types.ObjectId.isValid(id)) {
+                lead = await Lead.findById(id).lean();
+            }
+
+            // If not found by ObjectId, try finding by profile_id
+            if (!lead) {
+                const profileId = parseInt(id, 10);
+                if (!isNaN(profileId)) {
+                    lead = await Lead.findOne({ profile_id: profileId }).lean();
+                }
+            }
+
+            if (!lead) {
+                return null;
+            }
+
+            // Transform dates to strings for GraphQL
+            const transformAcquired = (acquired) => {
+                if (!acquired || !Array.isArray(acquired)) return [];
+                return acquired.map(item => ({
+                    ...item,
+                    _id: item._id?.toString() || '',
+                    received: item.received ? new Date(item.received).toISOString() : '',
+                    created_at: item.created_at ? new Date(item.created_at).toISOString() : '',
+                }));
+            };
+
+            return {
+                _id: lead._id.toString(),
+                profile_id: lead.profile_id,
+                organization: lead.organization,
+                profile: lead.profile || null,
+                stage: lead.stage,
+                prefered: lead.prefered || null,
+                pretype: lead.pretype || null,
+                bathroom: lead.bathroom || 0,
+                parking: lead.parking || 0,
+                project: lead.project || [],
+                floor: lead.floor || '',
+                facing: lead.facing || '',
+                merge_id: lead.merge_id || [],
+                acquired: transformAcquired(lead.acquired),
+                createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',
+                updatedAt: lead.updatedAt ? new Date(lead.updatedAt).toISOString() : '',
+            };
+        } catch (err) {
+            throw new AppError('Failed to fetch lead: ' + err.message, 500);
         }
     }
 }

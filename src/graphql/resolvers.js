@@ -6,5 +6,8 @@ export const resolvers = {
         getAllLeads: async (_, { organization }) => {
             return await leadService.getAllLeads(organization);
         },
+        getLeadById: async (_, { organization, id }) => {
+            return await leadService.getLeadById(organization, id);
+        },
     },
 };

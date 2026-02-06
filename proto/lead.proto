@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package lead;
 
-// Lead message representing a lead record
+// Lead message representing lead record
 message Lead {
   int32 profile_id = 1;
   string name = 2;

@@ -7,21 +7,18 @@ const LeadSchema = new Schema(
         profile: {
             name: { type: String, required: true },
             email: { type: String },
-            phone: { type: String },
+            phone: { type: String, required: true },
             location: { type: String },
         },
-        prefered: {
+        requirement: {
             location: { type: String },
             budget: { type: String },
+            bathroom: { type: Number },
+            parking: { type: Number },
+            floor: { type: String },
+            facing: { type: String },
         },
-        pretype: {
-            type: { type: [String], default: [] },
-        },
-        bathroom: { type: Number },
-        parking: { type: Number },
         project: [{ type: String }],
-        floor: { type: String },
-        facing: { type: String },
         engaged: { type: Object },
         merge_id: [{ type: String }],
         acquired: [{
@@ -32,7 +29,7 @@ const LeadSchema = new Schema(
             created_at: { type: Date },
             medium: { type: String },
         }],
-        stage: { type: Number },
+        stage: { type: String },
         created_at: { type: Date },
         updated_at: { type: Date },
     },

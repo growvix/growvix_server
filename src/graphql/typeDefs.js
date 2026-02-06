@@ -51,7 +51,7 @@ export const typeDefs = `#graphql
         facing: String
         merge_id: [String]
         acquired: [LeadAcquired]
-        stage: Int
+        stage: String
         createdAt: String
         updatedAt: String
     }

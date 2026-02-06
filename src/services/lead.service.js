@@ -18,6 +18,11 @@ export class LeadService {
             const nextProfileId = lastLead ? lastLead.profile_id + 1 : 1;
             data.profile_id = nextProfileId;
 
+            // Set default stage to 1 (new lead) if not provided
+            if (data.stage === undefined || data.stage === null) {
+                data.stage = "new lead";
+            }
+
             const lead = await Lead.create(data);
             return lead;
         } catch (err) {

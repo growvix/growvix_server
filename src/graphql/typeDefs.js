@@ -52,12 +52,39 @@ export const typeDefs = `#graphql
         merge_id: [String]
         acquired: [LeadAcquired]
         stage: String
+        status: String
         createdAt: String
         updatedAt: String
+    }
+
+    type LeadActivity {
+        id: String!
+        profile_id: Int!
+        lead_id: String!
+        user_id: String!
+        stage: String!
+        status: String
+        notes: String
+        createdAt: String
+        updatedAt: String
+    }
+
+    input CreateLeadActivityInput {
+        profile_id: Int!
+        lead_id: String!
+        user_id: String!
+        stage: String!
+        status: String
+        notes: String
     }
 
     type Query {
         getAllLeads(organization: String!): [Lead!]!
         getLeadById(organization: String!, id: String!): LeadDetail
+        getLeadActivities(organization: String!, leadId: String!): [LeadActivity!]!
+    }
+
+    type Mutation {
+        createLeadActivity(organization: String!, input: CreateLeadActivityInput!): LeadActivity!
     }
 `;

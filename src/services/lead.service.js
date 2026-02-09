@@ -39,13 +39,10 @@ export class LeadService {
             const Lead = getLeadModel(orgConn);
 
             const leads = await Lead.find({}).lean();
-
-            // Transform leads to the required format for table display
             return leads.map(lead => {
                 const receivedValue = lead.acquired?.[0]?.received;
                 let receivedStr = '';
                 if (receivedValue) {
-                    // Handle Date objects, strings, or timestamps
                     const date = receivedValue instanceof Date ? receivedValue : new Date(receivedValue);
                     receivedStr = !isNaN(date.getTime()) ? date.toISOString() : String(receivedValue);
                 }

@@ -2,6 +2,7 @@ import mongoose, { Schema } from 'mongoose';
 
 const LeadSchema = new Schema(
     {
+        _id: { type: Schema.Types.UUID },
         profile_id: { type: Number, required: true, unique: true },
         organization: { type: String, required: true },
         profile: {
@@ -30,6 +31,7 @@ const LeadSchema = new Schema(
             medium: { type: String },
         }],
         stage: { type: String },
+        status: { type: String },
         created_at: { type: Date },
         updated_at: { type: Date },
     },

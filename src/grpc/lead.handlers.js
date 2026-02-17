@@ -7,22 +7,22 @@ import { leadService } from '../services/lead.service.js';
  * @returns {Object} Response with leads array
  */
 export async function getAllLeads(req) {
-    const { organization } = req;
+    const { organization, filters } = req;
 
     if (!organization) {
         throw new Error('Organization is required');
     }
 
-    const leads = await leadService.getAllLeads(organization);
+    const leads = await leadService.getAllLeads(organization, filters || {});
 
-    // Transform to match proto schema
     return {
         leads: leads.map(lead => ({
-            profileId: lead.profile_id,
+            lead_id: lead.lead_id,
+            profile_id: lead.profile_id,
             name: lead.name || '',
             campaign: lead.campaign || '',
             source: lead.source || '',
-            subSource: lead.sub_source || '',
+            sub_source: lead.sub_source || '',
             received: lead.received || ''
         }))
     };

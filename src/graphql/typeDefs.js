@@ -2,6 +2,7 @@
 
 export const typeDefs = `#graphql
     type Lead {
+        _id: String!
         profile_id: Int!
         name: String
         campaign: String
@@ -19,7 +20,7 @@ export const typeDefs = `#graphql
 
     type LeadPrefered {
         location: String
-        budget: String
+        budget: String 
     }
 
     type LeadPretype {
@@ -55,12 +56,11 @@ export const typeDefs = `#graphql
         status: String
         createdAt: String
         updatedAt: String
+        activities: [LeadActivity!]!
     }
 
     type LeadActivity {
         id: String!
-        profile_id: Int!
-        lead_id: String!
         user_id: String!
         stage: String!
         status: String
@@ -82,6 +82,7 @@ export const typeDefs = `#graphql
         getAllLeads(organization: String!): [Lead!]!
         getLeadById(organization: String!, id: String!): LeadDetail
         getLeadActivities(organization: String!, leadId: String!): [LeadActivity!]!
+        getLeadActivitiesByProfileId(organization: String!, profileId: Int!): [LeadActivity!]!
     }
 
     type Mutation {

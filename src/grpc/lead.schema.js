@@ -4,7 +4,8 @@ import { create, toBinary, fromBinary } from '@bufbuild/protobuf';
 
 // Define Lead schema manually for Connect protocol
 export const LeadSchema = {
-    profileId: 0,
+    _id: '',
+    profileId: '',
     name: '',
     campaign: '',
     source: '',

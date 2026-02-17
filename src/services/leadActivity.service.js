@@ -113,6 +113,39 @@ export class LeadActivityService {
             throw new AppError('Failed to fetch lead activities: ' + err.message, 500);
         }
     }
+
+    /**
+     * Get all activities for a lead by profile_id
+     */
+    async getActivitiesByProfileId(organization, profileId) {
+        if (!organization) {
+            throw new AppError('Organization is required', 400);
+        }
+        if (!profileId) {
+            throw new AppError('Profile ID is required', 400);
+        }
+
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const LeadActivity = getLeadActivityModel(orgConn);
+
+            const activities = await LeadActivity.find({ profile_id: profileId })
+                .sort({ createdAt: -1 })
+                .lean();
+
+            return activities.map(activity => ({
+                id: activity.id,
+                user_id: activity.user_id,
+                stage: activity.stage,
+                status: activity.status,
+                notes: activity.notes,
+                createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
+                updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
+            }));
+        } catch (err) {
+            throw new AppError('Failed to fetch lead activities: ' + err.message, 500);
+        }
+    }
 }
 
 export const leadActivityService = new LeadActivityService();

@@ -2,6 +2,7 @@ import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadModel } from '../models/lead.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import mongoose from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 
 export class LeadService {
     async addLead(data) {
@@ -23,6 +24,9 @@ export class LeadService {
                 data.stage = "new lead";
             }
 
+            // Assign UUID v4 as _id
+            data._id = uuidv4();
+
             const lead = await Lead.create(data);
             return lead;
         } catch (err) {
@@ -30,7 +34,7 @@ export class LeadService {
         }
     }
 
-    async getAllLeads(organization) {
+    async getAllLeads(organization, filters = {}) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -38,7 +42,22 @@ export class LeadService {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
 
-            const leads = await Lead.find({}).lean();
+            // Build query from filters
+            const query = {};
+            if (filters.name) {
+                query['profile.name'] = { $regex: filters.name, $options: 'i' };
+            }
+            if (filters.source) {
+                query['acquired.source'] = { $regex: filters.source, $options: 'i' };
+            }
+            if (filters.campaign) {
+                query['acquired.campaign'] = { $regex: filters.campaign, $options: 'i' };
+            }
+            if (filters.status) {
+                query['status'] = filters.status;
+            }
+
+            const leads = await Lead.find(query).lean();
             return leads.map(lead => {
                 const receivedValue = lead.acquired?.[0]?.received;
                 let receivedStr = '';
@@ -46,7 +65,9 @@ export class LeadService {
                     const date = receivedValue instanceof Date ? receivedValue : new Date(receivedValue);
                     receivedStr = !isNaN(date.getTime()) ? date.toISOString() : String(receivedValue);
                 }
+
                 return {
+                    lead_id: lead._id.toString(),
                     profile_id: lead.profile_id,
                     name: lead.profile?.name || '',
                     campaign: lead.acquired?.[0]?.campaign || '',
@@ -71,13 +92,11 @@ export class LeadService {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
 
-            // Try to find by ObjectId first, then by profile_id
+            // Find by UUID _id first, then fall back to profile_id
             let lead;
-            if (mongoose.Types.ObjectId.isValid(id)) {
-                lead = await Lead.findById(id).lean();
-            }
+            lead = await Lead.findById(id).lean();
 
-            // If not found by ObjectId, try finding by profile_id
+            // If not found by _id, try finding by profile_id
             if (!lead) {
                 const profileId = parseInt(id, 10);
                 if (!isNaN(profileId)) {
@@ -106,6 +125,7 @@ export class LeadService {
                 organization: lead.organization,
                 profile: lead.profile || null,
                 stage: lead.stage,
+                status: lead.status,
                 prefered: lead.prefered || null,
                 pretype: lead.pretype || null,
                 bathroom: lead.bathroom || 0,

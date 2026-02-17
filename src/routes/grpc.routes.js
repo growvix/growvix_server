@@ -5,8 +5,52 @@ import { leadServiceHandlers } from '../grpc/lead.handlers.js';
 const router = Router();
 
 /**
- * POST /grpc/lead/GetAllLeads
- * Connect protocol endpoint for GetAllLeads
+ * @swagger
+ * /grpc/lead/GetAllLeads:
+ *   post:
+ *     summary: Get all leads (gRPC/Connect protocol)
+ *     tags: [gRPC]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [organization]
+ *             properties:
+ *               organization:
+ *                 type: string
+ *                 description: Organization name
+ *               filters:
+ *                 type: object
+ *                 description: Optional filters
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                     description: Filter by lead name (case-insensitive, partial match)
+ *                   source:
+ *                     type: string
+ *                     description: Filter by source (case-insensitive, partial match)
+ *                   campaign:
+ *                     type: string
+ *                     description: Filter by campaign (case-insensitive, partial match)
+ *                   status:
+ *                     type: string
+ *                     description: Filter by status (exact match)
+ *     responses:
+ *       200:
+ *         description: Leads fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 leads:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/LeadListItem'
+ *       400:
+ *         description: Failed to fetch leads
  */
 router.post('/lead/GetAllLeads', async (req, res) => {
     try {

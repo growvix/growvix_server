@@ -21,6 +21,9 @@ export const resolvers = {
         createLeadActivity: async (_, { organization, input }) => {
             return await leadActivityService.createActivity(organization, input);
         },
+        updateLead: async (_, { organization, id, input }) => {
+            return await leadService.updateLead(organization, id, input);
+        },
     },
     LeadDetail: {
         activities: async (parent, _, context) => {

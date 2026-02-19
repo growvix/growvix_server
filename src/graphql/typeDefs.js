@@ -61,6 +61,8 @@ export const typeDefs = `#graphql
 
     type LeadActivity {
         id: String!
+        profile_id: Int!
+        lead_id: String!
         user_id: String!
         stage: String!
         status: String
@@ -85,7 +87,13 @@ export const typeDefs = `#graphql
         getLeadActivitiesByProfileId(organization: String!, profileId: Int!): [LeadActivity!]!
     }
 
+    input UpdateLeadInput {
+        stage: String
+        status: String
+    }
+ 
     type Mutation {
         createLeadActivity(organization: String!, input: CreateLeadActivityInput!): LeadActivity!
+        updateLead(organization: String!, id: String!, input: UpdateLeadInput!): LeadDetail
     }
 `;

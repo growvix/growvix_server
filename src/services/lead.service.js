@@ -94,7 +94,12 @@ export class LeadService {
 
             // Find by UUID _id first, then fall back to profile_id
             let lead;
-            lead = await Lead.findById(id).lean();
+            try {
+                lead = await Lead.findById(id).lean();
+            } catch {
+                // id is not a valid ObjectId (e.g. a plain number) — skip to profile_id lookup
+                lead = null;
+            }
 
             // If not found by _id, try finding by profile_id
             if (!lead) {

@@ -30,6 +30,10 @@ const UserSchemaDefinition = {
     password: { type: String, select: false },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     isActive: { type: Boolean, default: true },
+    teams: [{
+        teamId: { type: mongoose.Schema.Types.UUID },
+        teamName: { type: String }
+    }],
 };
 
 // Schema options

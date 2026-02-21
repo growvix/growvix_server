@@ -31,6 +31,10 @@ const UserSchema = new Schema(
         password: { type: String, required: true, select: false },
         role: { type: String, enum: ['user', 'admin'], default: 'user' },
         isActive: { type: Boolean, default: true },
+        teams: [{
+            teamId: { type: mongoose.Schema.Types.UUID },
+            teamName: { type: String }
+        }],
     },
     {
         timestamps: true,

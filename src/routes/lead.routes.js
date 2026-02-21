@@ -78,5 +78,7 @@ router.post('/', validateLead, leadController.addLead);
  */
 router.get('/stages/:organization', leadStageController.getStages);
 
+router.get('/search/:organization/:profileId', leadController.getLeadByProfileId);
+
 export default router;
 

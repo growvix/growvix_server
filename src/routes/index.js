@@ -4,6 +4,7 @@ import userRoutes from './user.routes.js';
 import leadRoutes from './lead.routes.js';
 import projectRoutes from './project.routes.js';
 import uploadRoutes from './upload.routes.js';
+import teamRoutes from './team.routes.js';
 
 const router = Router();
 
@@ -12,5 +13,6 @@ router.use('/users', userRoutes);
 router.use('/leads', leadRoutes);
 router.use('/projects', projectRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/teams', teamRoutes);
 
 export default router;

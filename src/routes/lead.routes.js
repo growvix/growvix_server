@@ -78,6 +78,49 @@ router.post('/', validateLead, leadController.addLead);
  */
 router.get('/stages/:organization', leadStageController.getStages);
 
+/**
+ * @swagger
+ * /api/leads/search/{organization}/{profileId}:
+ *   get:
+ *     summary: Search lead by profile ID
+ *     tags: [Leads]
+ *     parameters:
+ *       - in: path
+ *         name: organization
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization name
+ *       - in: path
+ *         name: profileId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Numeric profile ID of the lead
+ *     responses:
+ *       200:
+ *         description: Lead fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     profile_id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *       404:
+ *         description: Lead not found
+ */
 router.get('/search/:organization/:profileId', leadController.getLeadByProfileId);
 
 export default router;

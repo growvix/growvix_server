@@ -34,6 +34,7 @@ const UserSchemaDefinition = {
         teamId: { type: mongoose.Schema.Types.UUID },
         teamName: { type: String }
     }],
+    permissions: [{ type: String }],
 };
 
 // Schema options

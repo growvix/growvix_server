@@ -35,6 +35,7 @@ const UserSchema = new Schema(
             teamId: { type: mongoose.Schema.Types.UUID },
             teamName: { type: String }
         }],
+        permissions: [{ type: String }],
     },
     {
         timestamps: true,

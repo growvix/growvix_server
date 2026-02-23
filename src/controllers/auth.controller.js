@@ -19,7 +19,8 @@ export class AuthController {
             lastName: result.lastName,
             email: result.email,
             token: result.token,
-            role: result.role
+            role: result.role,
+            permissions: result.permissions || []
         };
 
         res.status(200).json(ApiResponse.success('Login successful', responseData));

@@ -48,6 +48,7 @@ export class AuthService {
                 globalUserId: user._id,
                 profile: user.profile,
                 role: user.role,
+                permissions: user.permissions || [],
                 isActive: true
             };
             await ClientUser.create(clientUserData);
@@ -94,7 +95,8 @@ export class AuthService {
             firstName: user.profile.firstName,
             lastName: user.profile.lastName,
             email: user.profile.email,
-            role: user.role
+            role: user.role,
+            permissions: user.permissions || []
         };
     }
 }

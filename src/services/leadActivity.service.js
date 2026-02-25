@@ -1,6 +1,7 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadActivityModel } from '../models/leadActivity.model.js';
 import { getLeadModel } from '../models/lead.model.js';
+import { getClientUserModel } from '../models/clientUser.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 
 export class LeadActivityService {
@@ -27,46 +28,60 @@ export class LeadActivityService {
         if (!data.user_id) {
             throw new AppError('User ID is required', 400);
         }
-        if (!data.stage) {
-            throw new AppError('Stage is required', 400);
-        }
 
         try {
             const orgConn = await getOrganizationConnection(organization);
             const LeadActivity = getLeadActivityModel(orgConn);
             const Lead = getLeadModel(orgConn);
 
-            // Update the lead's stage and status in the leads table
-            const updateFields = { updated_at: new Date() };
-            if (data.stage) updateFields.stage = data.stage;
-            if (data.status) updateFields.status = data.status;
+            // Only update the lead's stage and status if provided
+            if (data.stage || data.status) {
+                const updateFields = { updated_at: new Date() };
+                if (data.stage) updateFields.stage = data.stage;
+                if (data.status) updateFields.status = data.status;
 
-            await Lead.findOneAndUpdate(
-                { profile_id: data.profile_id },
-                updateFields,
-                { new: true }
-            );
-            console.log('Lead updated successfully - stage:', data.stage, 'status:', data.status);
+                await Lead.findOneAndUpdate(
+                    { profile_id: data.profile_id },
+                    updateFields,
+                    { new: true }
+                );
+                console.log('Lead updated successfully - stage:', data.stage, 'status:', data.status);
+            }
 
             // Create the activity record
             const activity = await LeadActivity.create({
                 profile_id: data.profile_id,
+                updates: data.updates,
                 lead_id: data.lead_id,
+                reason: data.reason || '',
                 user_id: data.user_id,
-                stage: data.stage,
+                stage: data.stage || '',
                 status: data.status || '',
-                notes: data.notes || ''
+                notes: data.notes || '',
+                follow_up_date: data.follow_up_date || null,
+                site_visit_date: data.site_visit_date || null
             });
             console.log('Activity created successfully:', activity.id);
+            console.log('Activity:', activity);
+
+            // Resolve user name
+            const ClientUser = getClientUserModel(orgConn);
+            const user = await ClientUser.findOne({ profile_id: Number(activity.user_id) }).lean();
+            const user_name = user ? `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() : 'Unknown';
 
             return {
                 id: activity.id,
                 profile_id: activity.profile_id,
+                updates: activity.updates,
                 lead_id: activity.lead_id,
+                reason: activity.reason,
                 user_id: activity.user_id,
+                user_name,
                 stage: activity.stage,
                 status: activity.status,
                 notes: activity.notes,
+                follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
+                site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             };
@@ -98,14 +113,24 @@ export class LeadActivityService {
                 .sort({ createdAt: -1 })
                 .lean();
 
+            // Batch-resolve user names
+            const ClientUser = getClientUserModel(orgConn);
+            const uniqueUserIds = [...new Set(activities.map(a => Number(a.user_id)))];
+            const users = await ClientUser.find({ profile_id: { $in: uniqueUserIds } }).lean();
+            const userMap = new Map(users.map(u => [u.profile_id, `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim()]));
+
             return activities.map(activity => ({
                 id: activity.id,
                 profile_id: activity.profile_id,
+                updates: activity.updates,
                 lead_id: activity.lead_id,
                 user_id: activity.user_id,
+                user_name: userMap.get(Number(activity.user_id)) || 'Unknown',
                 stage: activity.stage,
                 status: activity.status,
                 notes: activity.notes,
+                follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
+                site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             }));
@@ -133,12 +158,23 @@ export class LeadActivityService {
                 .sort({ createdAt: -1 })
                 .lean();
 
+            // Batch-resolve user names
+            const ClientUser = getClientUserModel(orgConn);
+            const uniqueUserIds = [...new Set(activities.map(a => Number(a.user_id)))];
+            const users = await ClientUser.find({ profile_id: { $in: uniqueUserIds } }).lean();
+            const userMap = new Map(users.map(u => [u.profile_id, `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim()]));
+
             return activities.map(activity => ({
                 id: activity.id,
+                updates: activity.updates,
                 user_id: activity.user_id,
+                user_name: userMap.get(Number(activity.user_id)) || 'Unknown',
                 stage: activity.stage,
+                reason: activity.reason,
                 status: activity.status,
                 notes: activity.notes,
+                follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
+                site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             }));

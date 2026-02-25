@@ -42,3 +42,16 @@ export const authorize = (...roles) => {
         next();
     };
 };
+
+export const authorizePermission = (permission) => {
+    return (req, res, next) => {
+        const hasPermission = req.user && req.user.permissions && req.user.permissions.includes(permission);
+
+        if (!hasPermission) {
+            return next(
+                new AppError(`User is not authorized to access this route. Requires permission: ${permission}`, 403)
+            );
+        }
+        next();
+    };
+};

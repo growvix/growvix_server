@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { userController } from '../controllers/user.controller.js';
-import { protect, authorize } from '../middleware/auth.middleware.js';
+import { protect, authorize, authorizePermission } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
@@ -53,9 +53,9 @@ router.get('/me', userController.getMe);
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden - admin only
+ *         description: Forbidden - requires view_users permission
  */
-router.get('/', authorize('admin'), userController.getAllUsers);
+router.get('/', authorizePermission('view_users'), userController.getAllUsers);
 
 /**
  * @swagger
@@ -78,7 +78,7 @@ router.get('/', authorize('admin'), userController.getAllUsers);
  *       404:
  *         description: User not found
  */
-router.get('/:id', authorize('admin'), userController.getUser);
+router.get('/:id', authorizePermission('view_users'), userController.getUser);
 
 /**
  * @swagger
@@ -112,7 +112,7 @@ router.get('/:id', authorize('admin'), userController.getUser);
  *       200:
  *         description: User updated
  */
-router.put('/:id', authorize('admin'), userController.updateUser);
+router.put('/:id', authorizePermission('edit_users'), userController.updateUser);
 
 /**
  * @swagger
@@ -132,7 +132,7 @@ router.put('/:id', authorize('admin'), userController.updateUser);
  *       200:
  *         description: User deleted
  */
-router.delete('/:id', authorize('admin'), userController.deleteUser);
+router.delete('/:id', authorizePermission('delete_users'), userController.deleteUser);
 
 /**
  * @swagger
@@ -167,6 +167,6 @@ router.delete('/:id', authorize('admin'), userController.deleteUser);
  *       201:
  *         description: User created successfully
  */
-router.post('/', authorize('admin'), userController.createUser);
+router.post('/', authorizePermission('add_users'), userController.createUser);
 
 export default router;

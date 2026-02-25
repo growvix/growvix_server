@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { projectController } from '../controllers/project.controller.js';
 import { body, validationResult } from 'express-validator';
+import { protect, authorizePermission } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
@@ -146,6 +147,6 @@ router.get('/:id/blocks', projectController.getProjectBlocks);
  *       200:
  *         description: Project updated successfully
  */
-router.put('/:id', projectController.updateProject);
+router.put('/:id', protect, authorizePermission('edit_inventory'), projectController.updateProject);
 
 export default router;

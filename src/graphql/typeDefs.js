@@ -64,9 +64,14 @@ export const typeDefs = `#graphql
         profile_id: Int!
         lead_id: String!
         user_id: String!
-        stage: String!
+        user_name: String
+        updates: String
+        stage: String
+        site_visit_date: String
         status: String
         notes: String
+        reason: String
+        follow_up_date: String
         createdAt: String
         updatedAt: String
     }
@@ -74,10 +79,14 @@ export const typeDefs = `#graphql
     input CreateLeadActivityInput {
         profile_id: Int!
         lead_id: String!
+        updates: String!
         user_id: String!
-        stage: String!
+        reason: String
+        stage: String
+        site_visit_date: String
         status: String
         notes: String
+        follow_up_date: String
     }
 
     type Query {

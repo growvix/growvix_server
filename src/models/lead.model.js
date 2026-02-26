@@ -34,6 +34,7 @@ const LeadSchema = new Schema(
         status: { type: String },
         created_at: { type: Date },
         updated_at: { type: Date },
+        exe_user: { type: Schema.Types.UUID },
     },
     {
         timestamps: true,

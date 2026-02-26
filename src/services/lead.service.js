@@ -3,6 +3,7 @@ import { getLeadModel } from '../models/lead.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
+import { roundRobinService } from './roundRobin.service.js';
 
 export class LeadService {
     async addLead(data) {
@@ -26,6 +27,16 @@ export class LeadService {
 
             // Assign UUID v4 as _id
             data._id = uuidv4();
+
+            // Round-robin: assign to next pre-sales user
+            try {
+                const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
+                if (assignedUserId) {
+                    data.exe_user = assignedUserId;
+                }
+            } catch (rrErr) {
+                console.error('Round-robin assignment failed (lead will be unassigned):', rrErr.message);
+            }
 
             const lead = await Lead.create(data);
             return lead;
@@ -74,6 +85,7 @@ export class LeadService {
                     source: lead.acquired?.[0]?.source || '',
                     sub_source: lead.acquired?.[0]?.sub_source || '',
                     received: receivedStr,
+                    exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 };
             });
         } catch (err) {
@@ -140,6 +152,7 @@ export class LeadService {
                 facing: lead.facing || '',
                 merge_id: lead.merge_id || [],
                 acquired: transformAcquired(lead.acquired),
+                exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',
                 updatedAt: lead.updatedAt ? new Date(lead.updatedAt).toISOString() : '',
             };
@@ -160,7 +173,7 @@ export class LeadService {
             const Lead = getLeadModel(orgConn);
 
             // Build update object from allowed fields only
-            const allowedFields = ['stage', 'status'];
+            const allowedFields = ['stage', 'status', 'exe_user'];
             const update = {};
             for (const field of allowedFields) {
                 if (updateData[field] !== undefined) {
@@ -205,6 +218,7 @@ export class LeadService {
                 facing: lead.facing || '',
                 merge_id: lead.merge_id || [],
                 acquired: transformAcquired(lead.acquired),
+                exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',
                 updatedAt: lead.updatedAt ? new Date(lead.updatedAt).toISOString() : '',
             };

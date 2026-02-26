@@ -13,6 +13,7 @@ export const registerSchema = z.object({
         }),
         password: z.string().min(6, "Password must be at least 6 characters"),
         role: z.enum(['user', 'admin']).optional(),
+        department: z.enum(['pre-sales', 'sales', 'post-sales']).optional(),
         permissions: z.array(z.string()).optional(),
     }),
 });

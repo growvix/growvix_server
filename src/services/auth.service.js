@@ -48,6 +48,7 @@ export class AuthService {
                 globalUserId: user._id,
                 profile: user.profile,
                 role: user.role,
+                department: user.department,
                 permissions: user.permissions || [],
                 isActive: true
             };
@@ -90,6 +91,7 @@ export class AuthService {
         return {
             user: userObj,
             token,
+            user_id: user._id.toString(),
             profile_id: user.profile_id,
             organization: user.organization,
             firstName: user.profile.firstName,

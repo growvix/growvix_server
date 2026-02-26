@@ -1,5 +1,7 @@
 // gRPC/Connect Lead Service Implementation
 import { leadService } from '../services/lead.service.js';
+import { getOrganizationConnection } from '../config/multiTenantDb.js';
+import { getClientUserModel } from '../models/clientUser.model.js';
 
 /**
  * GetAllLeads handler for Connect RPC
@@ -15,6 +17,22 @@ export async function getAllLeads(req) {
 
     const leads = await leadService.getAllLeads(organization, filters || {});
 
+    // Batch-resolve exe_user_name
+    let userMap = {};
+    try {
+        const userIds = [...new Set(leads.filter(l => l.exe_user).map(l => l.exe_user))];
+        if (userIds.length > 0) {
+            const orgConn = await getOrganizationConnection(organization);
+            const ClientUser = getClientUserModel(orgConn);
+            const users = await ClientUser.find({ _id: { $in: userIds } }).select('_id profile').lean();
+            users.forEach(u => {
+                userMap[u._id.toString()] = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
+            });
+        }
+    } catch (err) {
+        console.error('Failed to resolve exe_user names in gRPC:', err.message);
+    }
+
     return {
         leads: leads.map(lead => ({
             lead_id: lead.lead_id,
@@ -23,7 +41,9 @@ export async function getAllLeads(req) {
             campaign: lead.campaign || '',
             source: lead.source || '',
             sub_source: lead.sub_source || '',
-            received: lead.received || ''
+            received: lead.received || '',
+            exe_user: lead.exe_user || '',
+            exe_user_name: lead.exe_user ? (userMap[lead.exe_user] || '') : '',
         }))
     };
 }

@@ -9,6 +9,8 @@ export const typeDefs = `#graphql
         source: String
         sub_source: String
         received: String
+        exe_user: String
+        exe_user_name: String
     }
 
     type LeadProfile {
@@ -54,6 +56,8 @@ export const typeDefs = `#graphql
         acquired: [LeadAcquired]
         stage: String
         status: String
+        exe_user: String
+        exe_user_name: String
         createdAt: String
         updatedAt: String
         activities: [LeadActivity!]!
@@ -99,6 +103,7 @@ export const typeDefs = `#graphql
     input UpdateLeadInput {
         stage: String
         status: String
+        exe_user: String
     }
  
     type Mutation {

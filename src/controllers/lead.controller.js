@@ -14,7 +14,7 @@ export class LeadController {
         if (!lead) {
             return res.status(404).json(ApiResponse.error('Lead not found'));
         }
-        res.status(200).json(ApiResponse.success('Lead fetched', { _id: lead._id, profile_id: lead.profile_id, name: lead.profile?.name || '' }));
+        res.status(200).json(ApiResponse.success('Lead fetched', { _id: lead._id, profile_id: lead.profile_id, name: lead.profile?.name || '', exe_user: lead.exe_user || '' }));
     });
 }
 

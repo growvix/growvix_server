@@ -88,6 +88,7 @@ const options = {
                         },
                         stage: { type: 'string' },
                         status: { type: 'string' },
+                        exe_user: { type: 'string', format: 'uuid' },
                     },
                 },
                 LeadListItem: {
@@ -100,6 +101,7 @@ const options = {
                         source: { type: 'string' },
                         sub_source: { type: 'string' },
                         received: { type: 'string' },
+                        exe_user: { type: 'string', format: 'uuid' },
                     },
                 },
                 Project: {
@@ -121,6 +123,7 @@ const options = {
                         email: { type: 'string' },
                         role: { type: 'string' },
                         organization: { type: 'string' },
+                        department: { type: 'string', enum: ['pre-sales', 'sales', 'post-sales'] },
                     },
                 },
             },

@@ -13,6 +13,7 @@ export class AuthController {
 
         // Flatten response as requested
         const responseData = {
+            user_id: result.user_id,
             profile_id: result.profile_id,
             organization: result.organization,
             firstName: result.firstName,

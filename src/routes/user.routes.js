@@ -108,6 +108,9 @@ router.get('/:id', authorizePermission('view_users'), userController.getUser);
  *                 type: string
  *               role:
  *                 type: string
+ *               department:
+ *                 type: string
+ *                 enum: [pre-sales, sales, post-sales]
  *     responses:
  *       200:
  *         description: User updated
@@ -163,6 +166,9 @@ router.delete('/:id', authorizePermission('delete_users'), userController.delete
  *               role:
  *                 type: string
  *                 enum: [user, admin]
+ *               department:
+ *                 type: string
+ *                 enum: [pre-sales, sales, post-sales]
  *     responses:
  *       201:
  *         description: User created successfully

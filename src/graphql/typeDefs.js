@@ -29,6 +29,21 @@ export const typeDefs = `#graphql
         type: [String]
     }
 
+    type LeadPropertyRequirement {
+        sqft: Int
+        bhk: [String]
+        floor: [String]
+        balcony: Boolean
+        bathroom_count: Int
+        parking_needed: Boolean
+        parking_count: Int
+        price_min: Float
+        price_max: Float
+        furniture: [String]
+        facing: [String]
+        plot_type: String
+    }
+
     type LeadAcquired {
         campaign: String
         source: String
@@ -39,6 +54,12 @@ export const typeDefs = `#graphql
         _id: String
     }
 
+    type LeadRequirement {
+        _id: String!
+        key: String!
+        value: String!
+    }
+
     type LeadDetail {
         _id: String!
         profile_id: Int!
@@ -46,12 +67,9 @@ export const typeDefs = `#graphql
         profile: LeadProfile
         prefered: LeadPrefered
         pretype: LeadPretype
-        bathroom: Int
-        parking: Int
+        propertyRequirement: LeadPropertyRequirement
         
         project: [String]
-        floor: String
-        facing: String
         merge_id: [String]
         acquired: [LeadAcquired]
         stage: String
@@ -62,6 +80,7 @@ export const typeDefs = `#graphql
         updatedAt: String
         site_visits_completed: Int
         activities: [LeadActivity!]!
+        requirements: [LeadRequirement!]!
     }
 
     type LeadActivity {
@@ -110,10 +129,28 @@ export const typeDefs = `#graphql
         status: String
         exe_user: String
     }
+
+    input UpdatePropertyRequirementInput {
+        sqft: Int
+        bhk: [String]
+        floor: [String]
+        balcony: Boolean
+        bathroom_count: Int
+        parking_needed: Boolean
+        parking_count: Int
+        price_min: Float
+        price_max: Float
+        furniture: [String]
+        facing: [String]
+        plot_type: String
+    }
  
     type Mutation {
         createLeadActivity(organization: String!, input: CreateLeadActivityInput!): LeadActivity!
         updateLead(organization: String!, id: String!, input: UpdateLeadInput!): LeadDetail
         markSiteVisitCompleted(organization: String!, activityId: String!, userId: String!): LeadActivity!
+        addRequirement(organization: String!, leadId: String!, key: String!, value: String!): LeadDetail
+        removeRequirement(organization: String!, leadId: String!, requirementId: String!): LeadDetail
+        updatePropertyRequirement(organization: String!, leadId: String!, input: UpdatePropertyRequirementInput!): LeadDetail
     }
 `;

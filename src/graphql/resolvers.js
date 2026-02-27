@@ -50,6 +50,15 @@ export const resolvers = {
         markSiteVisitCompleted: async (_, { organization, activityId, userId }) => {
             return await leadActivityService.markSiteVisitCompleted(organization, activityId, userId);
         },
+        addRequirement: async (_, { organization, leadId, key, value }) => {
+            return await leadService.addRequirement(organization, leadId, key, value);
+        },
+        removeRequirement: async (_, { organization, leadId, requirementId }) => {
+            return await leadService.removeRequirement(organization, leadId, requirementId);
+        },
+        updatePropertyRequirement: async (_, { organization, leadId, input }) => {
+            return await leadService.updatePropertyRequirement(organization, leadId, input);
+        },
     },
     LeadDetail: {
         activities: async (parent, _, context) => {

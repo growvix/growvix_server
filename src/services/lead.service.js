@@ -150,13 +150,28 @@ export class LeadService {
                 status: lead.status,
                 prefered: lead.prefered || null,
                 pretype: lead.pretype || null,
-                bathroom: lead.bathroom || 0,
-                parking: lead.parking || 0,
+                propertyRequirement: lead.requirement ? {
+                    sqft: lead.requirement.sqft || null,
+                    bhk: lead.requirement.bhk || [],
+                    floor: lead.requirement.floor || [],
+                    balcony: lead.requirement.balcony || false,
+                    bathroom_count: lead.requirement.bathroom_count || null,
+                    parking_needed: lead.requirement.parking_needed || false,
+                    parking_count: lead.requirement.parking_count || null,
+                    price_min: lead.requirement.price_min || null,
+                    price_max: lead.requirement.price_max || null,
+                    furniture: lead.requirement.furniture || [],
+                    facing: lead.requirement.facing || [],
+                    plot_type: lead.requirement.plot_type || '',
+                } : null,
                 project: lead.project || [],
-                floor: lead.floor || '',
-                facing: lead.facing || '',
                 merge_id: lead.merge_id || [],
                 acquired: transformAcquired(lead.acquired),
+                requirements: (lead.requirements || []).map(r => ({
+                    _id: r._id?.toString() || '',
+                    key: r.key,
+                    value: r.value,
+                })),
                 exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',
                 updatedAt: lead.updatedAt ? new Date(lead.updatedAt).toISOString() : '',
@@ -230,6 +245,71 @@ export class LeadService {
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to update lead: ' + err.message, 500);
+        }
+    }
+
+    async addRequirement(organization, leadId, key, value) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!key || !value) throw new AppError('Key and value are required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+            const lead = await Lead.findByIdAndUpdate(
+                leadId,
+                { $push: { requirements: { key, value } } },
+                { new: true }
+            ).lean();
+            if (!lead) throw new AppError('Lead not found', 404);
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to add requirement: ' + err.message, 500);
+        }
+    }
+
+    async removeRequirement(organization, leadId, requirementId) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!requirementId) throw new AppError('Requirement ID is required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+            const lead = await Lead.findByIdAndUpdate(
+                leadId,
+                { $pull: { requirements: { _id: requirementId } } },
+                { new: true }
+            ).lean();
+            if (!lead) throw new AppError('Lead not found', 404);
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to remove requirement: ' + err.message, 500);
+        }
+    }
+
+    async updatePropertyRequirement(organization, leadId, input) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            const setFields = {};
+            for (const [key, value] of Object.entries(input)) {
+                setFields[`requirement.${key}`] = value;
+            }
+
+            const lead = await Lead.findByIdAndUpdate(
+                leadId,
+                { $set: setFields },
+                { new: true }
+            ).lean();
+            if (!lead) throw new AppError('Lead not found', 404);
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to update property requirement: ' + err.message, 500);
         }
     }
 }

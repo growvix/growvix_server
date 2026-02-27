@@ -70,6 +70,19 @@ export class LeadService {
             if (filters.stage) {
                 query['stage'] = filters.stage;
             }
+            if (filters.assignedTo) {
+                query['exe_user'] = filters.assignedTo;
+            }
+            if (filters.receivedOn) {
+                const date = new Date(filters.receivedOn);
+                if (!isNaN(date.getTime())) {
+                    const startOfDay = new Date(date);
+                    startOfDay.setHours(0, 0, 0, 0);
+                    const endOfDay = new Date(date);
+                    endOfDay.setHours(23, 59, 59, 999);
+                    query['acquired.received'] = { $gte: startOfDay, $lte: endOfDay };
+                }
+            }
 
             const leads = await Lead.find(query).lean();
             return leads.map(lead => {

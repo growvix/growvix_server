@@ -60,6 +60,7 @@ export const typeDefs = `#graphql
         exe_user_name: String
         createdAt: String
         updatedAt: String
+        site_visits_completed: Int
         activities: [LeadActivity!]!
     }
 
@@ -72,6 +73,10 @@ export const typeDefs = `#graphql
         updates: String
         stage: String
         site_visit_date: String
+        site_visit_completed: Boolean
+        site_visit_completed_at: String
+        site_visit_completed_by: String
+        site_visit_completed_by_name: String
         status: String
         notes: String
         reason: String
@@ -109,5 +114,6 @@ export const typeDefs = `#graphql
     type Mutation {
         createLeadActivity(organization: String!, input: CreateLeadActivityInput!): LeadActivity!
         updateLead(organization: String!, id: String!, input: UpdateLeadInput!): LeadDetail
+        markSiteVisitCompleted(organization: String!, activityId: String!, userId: String!): LeadActivity!
     }
 `;

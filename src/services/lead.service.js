@@ -67,6 +67,9 @@ export class LeadService {
             if (filters.status) {
                 query['status'] = filters.status;
             }
+            if (filters.stage) {
+                query['stage'] = filters.stage;
+            }
 
             const leads = await Lead.find(query).lean();
             return leads.map(lead => {
@@ -81,6 +84,8 @@ export class LeadService {
                     lead_id: lead._id.toString(),
                     profile_id: lead.profile_id,
                     name: lead.profile?.name || '',
+                    stage: lead.stage || '',
+                    status: lead.status || '',
                     campaign: lead.acquired?.[0]?.campaign || '',
                     source: lead.acquired?.[0]?.source || '',
                     sub_source: lead.acquired?.[0]?.sub_source || '',

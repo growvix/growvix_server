@@ -47,11 +47,18 @@ export const resolvers = {
         updateLead: async (_, { organization, id, input }) => {
             return await leadService.updateLead(organization, id, input);
         },
+        markSiteVisitCompleted: async (_, { organization, activityId, userId }) => {
+            return await leadActivityService.markSiteVisitCompleted(organization, activityId, userId);
+        },
     },
     LeadDetail: {
         activities: async (parent, _, context) => {
             // parent contains the LeadDetail object with organization and profile_id
             return await leadActivityService.getActivitiesByProfileId(parent.organization, parent.profile_id);
+        },
+        site_visits_completed: async (parent) => {
+            const activities = await leadActivityService.getActivitiesByProfileId(parent.organization, parent.profile_id);
+            return activities.filter(a => a.updates === 'site_visit' && a.site_visit_completed).length;
         },
         exe_user_name: async (parent) => {
             if (!parent.exe_user || !parent.organization) return '';

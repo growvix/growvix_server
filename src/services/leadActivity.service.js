@@ -59,7 +59,8 @@ export class LeadActivityService {
                 status: data.status || '',
                 notes: data.notes || '',
                 follow_up_date: data.follow_up_date || null,
-                site_visit_date: data.site_visit_date || null
+                site_visit_date: data.site_visit_date || null,
+                site_visit_completed: data.site_visit_completed || false
             });
             console.log('Activity created successfully:', activity.id);
             console.log('Activity:', activity);
@@ -82,6 +83,7 @@ export class LeadActivityService {
                 notes: activity.notes,
                 follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
                 site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                site_visit_completed: activity.site_visit_completed || false,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             };
@@ -113,9 +115,11 @@ export class LeadActivityService {
                 .sort({ createdAt: -1 })
                 .lean();
 
-            // Batch-resolve user names
+            // Batch-resolve user names (including completed_by users)
             const ClientUser = getClientUserModel(orgConn);
-            const uniqueUserIds = [...new Set(activities.map(a => Number(a.user_id)))];
+            const allUserIds = new Set(activities.map(a => Number(a.user_id)));
+            activities.forEach(a => { if (a.site_visit_completed_by) allUserIds.add(Number(a.site_visit_completed_by)); });
+            const uniqueUserIds = [...allUserIds];
             const users = await ClientUser.find({ profile_id: { $in: uniqueUserIds } }).lean();
             const userMap = new Map(users.map(u => [u.profile_id, `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim()]));
 
@@ -131,6 +135,10 @@ export class LeadActivityService {
                 notes: activity.notes,
                 follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
                 site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                site_visit_completed: activity.site_visit_completed || false,
+                site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
+                site_visit_completed_by: activity.site_visit_completed_by || null,
+                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(Number(activity.site_visit_completed_by)) || 'Unknown') : null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             }));
@@ -158,9 +166,11 @@ export class LeadActivityService {
                 .sort({ createdAt: -1 })
                 .lean();
 
-            // Batch-resolve user names
+            // Batch-resolve user names (including completed_by users)
             const ClientUser = getClientUserModel(orgConn);
-            const uniqueUserIds = [...new Set(activities.map(a => Number(a.user_id)))];
+            const allUserIds = new Set(activities.map(a => Number(a.user_id)));
+            activities.forEach(a => { if (a.site_visit_completed_by) allUserIds.add(Number(a.site_visit_completed_by)); });
+            const uniqueUserIds = [...allUserIds];
             const users = await ClientUser.find({ profile_id: { $in: uniqueUserIds } }).lean();
             const userMap = new Map(users.map(u => [u.profile_id, `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim()]));
 
@@ -175,11 +185,75 @@ export class LeadActivityService {
                 notes: activity.notes,
                 follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
                 site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                site_visit_completed: activity.site_visit_completed || false,
+                site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
+                site_visit_completed_by: activity.site_visit_completed_by || null,
+                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(Number(activity.site_visit_completed_by)) || 'Unknown') : null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             }));
         } catch (err) {
             throw new AppError('Failed to fetch lead activities: ' + err.message, 500);
+        }
+    }
+    /**
+     * Mark a site visit activity as completed
+     */
+    async markSiteVisitCompleted(organization, activityId, userId) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!activityId) throw new AppError('Activity ID is required', 400);
+        if (!userId) throw new AppError('User ID is required', 400);
+
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const LeadActivity = getLeadActivityModel(orgConn);
+
+            const activity = await LeadActivity.findOneAndUpdate(
+                { id: activityId, updates: 'site_visit' },
+                {
+                    site_visit_completed: true,
+                    site_visit_completed_at: new Date(),
+                    site_visit_completed_by: userId
+                },
+                { new: true }
+            ).lean();
+
+            if (!activity) throw new AppError('Site visit activity not found', 404);
+
+            // Resolve user names
+            const ClientUser = getClientUserModel(orgConn);
+            const user = await ClientUser.findOne({ profile_id: Number(activity.user_id) }).lean();
+            const user_name = user ? `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() : 'Unknown';
+
+            // Resolve the name of the user who marked it completed
+            let completed_by_name = 'Unknown';
+            if (activity.site_visit_completed_by) {
+                const completedByUser = await ClientUser.findOne({ profile_id: Number(activity.site_visit_completed_by) }).lean();
+                completed_by_name = completedByUser ? `${completedByUser.profile?.firstName || ''} ${completedByUser.profile?.lastName || ''}`.trim() : 'Unknown';
+            }
+
+            return {
+                id: activity.id,
+                profile_id: activity.profile_id,
+                updates: activity.updates,
+                lead_id: activity.lead_id,
+                user_id: activity.user_id,
+                user_name,
+                stage: activity.stage,
+                status: activity.status,
+                notes: activity.notes,
+                follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
+                site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                site_visit_completed: activity.site_visit_completed || false,
+                site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
+                site_visit_completed_by: activity.site_visit_completed_by || null,
+                site_visit_completed_by_name: completed_by_name,
+                createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
+                updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
+            };
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to mark site visit as completed: ' + err.message, 500);
         }
     }
 }

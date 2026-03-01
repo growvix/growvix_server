@@ -18,6 +18,11 @@ const UnitSchema = new Schema({
     position: {
         row: { type: Number },
         col: { type: Number }
+    },
+    bookedBy: {
+        leadName: { type: String },
+        leadUuid: { type: String },
+        phone: { type: String },
     }
 }, { _id: false });
 
@@ -50,7 +55,12 @@ const PlotSchema = new Schema({
         enum: ['available', 'booked', 'sold'],
         default: 'available'
     },
-    price: { type: Number }
+    price: { type: Number },
+    bookedBy: {
+        leadName: { type: String },
+        leadUuid: { type: String },
+        phone: { type: String },
+    }
 }, { _id: false });
 
 // Main Project Schema

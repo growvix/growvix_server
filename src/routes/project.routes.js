@@ -149,4 +149,48 @@ router.get('/:id/blocks', projectController.getProjectBlocks);
  */
 router.put('/:id', protect, authorizePermission('edit_inventory'), projectController.updateProject);
 
+/**
+ * @swagger
+ * /api/projects/{id}/book:
+ *   post:
+ *     summary: Book a unit or plot
+ *     tags: [Projects]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [organization, leadName, leadUuid, phone]
+ *             properties:
+ *               organization:
+ *                 type: string
+ *               leadName:
+ *                 type: string
+ *               leadUuid:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               unitId:
+ *                 type: string
+ *               plotId:
+ *                 type: string
+ *               blockId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Unit/Plot booked successfully
+ *       400:
+ *         description: Validation error or unit not available
+ *       404:
+ *         description: Project/Unit/Plot not found
+ */
+router.post('/:id/book', projectController.bookUnit);
+
 export default router;

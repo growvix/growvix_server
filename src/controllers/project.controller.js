@@ -34,6 +34,16 @@ export class ProjectController {
         const project = await projectService.updateProject(organization, id, req.body);
         res.status(200).json(ApiResponse.success('Project updated successfully', project));
     });
+
+    bookUnit = asyncHandler(async (req, res) => {
+        const organization = req.body.organization;
+        const { id } = req.params;
+        const { blockId, unitId, plotId, leadName, leadUuid, phone } = req.body;
+        const result = await projectService.bookUnit(organization, id, {
+            blockId, unitId, plotId, leadName, leadUuid, phone
+        });
+        res.status(200).json(ApiResponse.success('Unit booked successfully', result));
+    });
 }
 
 export const projectController = new ProjectController();

@@ -45,13 +45,17 @@ export class LeadService {
         }
     }
 
-    async getAllLeads(organization, filters = {}) {
+    async getAllLeads(organization, filters = {}, { offset = 0, limit = 30 } = {}) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
         try {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
+
+            // Sanitize pagination params
+            const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
+            const safeLimit = Math.max(1, parseInt(limit, 10) || 30);
 
             // Build query from filters
             const query = {};
@@ -84,8 +88,13 @@ export class LeadService {
                 }
             }
 
-            const leads = await Lead.find(query).lean();
-            return leads.map(lead => {
+            // Run count and paginated query in parallel
+            const [total, leads] = await Promise.all([
+                Lead.countDocuments(query),
+                Lead.find(query).skip(safeOffset).limit(safeLimit).lean(),
+            ]);
+
+            const mappedLeads = leads.map(lead => {
                 const receivedValue = lead.acquired?.[0]?.received;
                 let receivedStr = '';
                 if (receivedValue) {
@@ -106,6 +115,8 @@ export class LeadService {
                     exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 };
             });
+
+            return { leads: mappedLeads, total };
         } catch (err) {
             throw new AppError('Failed to fetch leads: ' + err.message, 500);
         }
@@ -178,6 +189,10 @@ export class LeadService {
                     plot_type: lead.requirement.plot_type || '',
                 } : null,
                 project: lead.project || [],
+                interested_projects: (lead.interested_projects || []).map(ip => ({
+                    project_id: ip.project_id,
+                    project_name: ip.project_name,
+                })),
                 merge_id: lead.merge_id || [],
                 acquired: transformAcquired(lead.acquired),
                 requirements: (lead.requirements || []).map(r => ({
@@ -323,6 +338,56 @@ export class LeadService {
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to update property requirement: ' + err.message, 500);
+        }
+    }
+
+    async addInterestedProject(organization, leadId, projectId, projectName) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!projectId) throw new AppError('Project ID is required', 400);
+        if (!projectName) throw new AppError('Project name is required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            // Use $addToSet to prevent duplicates (match by project_id)
+            // First check if project already exists
+            const existing = await Lead.findOne({
+                _id: leadId,
+                'interested_projects.project_id': projectId
+            }).lean();
+            if (existing) {
+                throw new AppError('Project already added to this lead', 400);
+            }
+
+            await Lead.findByIdAndUpdate(
+                leadId,
+                { $push: { interested_projects: { project_id: projectId, project_name: projectName } } },
+                { new: true }
+            );
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to add interested project: ' + err.message, 500);
+        }
+    }
+
+    async removeInterestedProject(organization, leadId, projectId) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!projectId) throw new AppError('Project ID is required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+            await Lead.findByIdAndUpdate(
+                leadId,
+                { $pull: { interested_projects: { project_id: projectId } } },
+                { new: true }
+            );
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to remove interested project: ' + err.message, 500);
         }
     }
 }

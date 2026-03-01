@@ -60,7 +60,9 @@ export class LeadActivityService {
                 notes: data.notes || '',
                 follow_up_date: data.follow_up_date || null,
                 site_visit_date: data.site_visit_date || null,
-                site_visit_completed: data.site_visit_completed || false
+                site_visit_completed: data.site_visit_completed || false,
+                site_visit_project_id: data.site_visit_project_id || null,
+                site_visit_project_name: data.site_visit_project_name || null
             });
             console.log('Activity created successfully:', activity.id);
             console.log('Activity:', activity);
@@ -84,6 +86,8 @@ export class LeadActivityService {
                 follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
                 site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
                 site_visit_completed: activity.site_visit_completed || false,
+                site_visit_project_id: activity.site_visit_project_id || null,
+                site_visit_project_name: activity.site_visit_project_name || null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             };
@@ -139,6 +143,8 @@ export class LeadActivityService {
                 site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
                 site_visit_completed_by: activity.site_visit_completed_by || null,
                 site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(Number(activity.site_visit_completed_by)) || 'Unknown') : null,
+                site_visit_project_id: activity.site_visit_project_id || null,
+                site_visit_project_name: activity.site_visit_project_name || null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             }));
@@ -189,6 +195,8 @@ export class LeadActivityService {
                 site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
                 site_visit_completed_by: activity.site_visit_completed_by || null,
                 site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(Number(activity.site_visit_completed_by)) || 'Unknown') : null,
+                site_visit_project_id: activity.site_visit_project_id || null,
+                site_visit_project_name: activity.site_visit_project_name || null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             }));
@@ -248,12 +256,103 @@ export class LeadActivityService {
                 site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
                 site_visit_completed_by: activity.site_visit_completed_by || null,
                 site_visit_completed_by_name: completed_by_name,
+                site_visit_project_id: activity.site_visit_project_id || null,
+                site_visit_project_name: activity.site_visit_project_name || null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
                 updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
             };
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to mark site visit as completed: ' + err.message, 500);
+        }
+    }
+
+    /**
+     * Get all site visit activities for calendar view with optional filters
+     * @param {string} organization
+     * @param {object} filters - { startDate, endDate, userId, teamId }
+     * @returns {array} List of site visit calendar entries
+     */
+    async getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId } = {}) {
+        if (!organization) throw new AppError('Organization is required', 400);
+
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const LeadActivity = getLeadActivityModel(orgConn);
+            const Lead = getLeadModel(orgConn);
+            const ClientUser = getClientUserModel(orgConn);
+
+            // Base filter: only site_visit activities that have a date
+            const filter = { updates: 'site_visit', site_visit_date: { $ne: null } };
+
+            // Date range filter
+            if (startDate || endDate) {
+                filter.site_visit_date = filter.site_visit_date || {};
+                if (startDate) filter.site_visit_date.$gte = new Date(startDate);
+                if (endDate) filter.site_visit_date.$lte = new Date(endDate);
+            }
+
+            // Team filter: resolve team members, then filter by user_id
+            if (teamId) {
+                const { getClientTeamModel } = await import('../models/team.model.js');
+                const Team = getClientTeamModel(orgConn);
+                const team = await Team.findById(teamId).lean();
+                if (team && team.members && team.members.length > 0) {
+                    // Get profile_ids for team members
+                    const memberUsers = await ClientUser.find({ _id: { $in: team.members } }).select('profile_id').lean();
+                    const memberProfileIds = memberUsers.map(u => String(u.profile_id));
+                    filter.user_id = { $in: memberProfileIds };
+                } else {
+                    return []; // team not found or empty
+                }
+            }
+
+            // Individual user filter (overrides team filter for user_id)
+            if (userId) {
+                filter.user_id = userId;
+            }
+
+            // Project filter
+            if (projectId) {
+                filter.site_visit_project_id = projectId;
+            }
+
+            const activities = await LeadActivity.find(filter)
+                .sort({ site_visit_date: 1 })
+                .lean();
+
+            if (activities.length === 0) return [];
+
+            // Batch-resolve user names
+            const allUserIds = new Set(activities.map(a => Number(a.user_id)));
+            activities.forEach(a => { if (a.site_visit_completed_by) allUserIds.add(Number(a.site_visit_completed_by)); });
+            const users = await ClientUser.find({ profile_id: { $in: [...allUserIds] } }).lean();
+            const userMap = new Map(users.map(u => [u.profile_id, `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim()]));
+
+            // Batch-resolve lead names
+            const leadIds = [...new Set(activities.map(a => a.lead_id))];
+            const leads = await Lead.find({ _id: { $in: leadIds } }).select('_id profile.name').lean();
+            const leadMap = new Map(leads.map(l => [l._id.toString(), l.profile?.name || 'Unknown']));
+
+            return activities.map(a => ({
+                id: a.id,
+                lead_id: a.lead_id,
+                lead_name: leadMap.get(a.lead_id) || 'Unknown',
+                profile_id: a.profile_id,
+                user_id: a.user_id,
+                user_name: userMap.get(Number(a.user_id)) || 'Unknown',
+                site_visit_date: a.site_visit_date ? new Date(a.site_visit_date).toISOString() : null,
+                site_visit_completed: a.site_visit_completed || false,
+                site_visit_completed_at: a.site_visit_completed_at ? new Date(a.site_visit_completed_at).toISOString() : null,
+                site_visit_completed_by: a.site_visit_completed_by || null,
+                site_visit_completed_by_name: a.site_visit_completed_by ? (userMap.get(Number(a.site_visit_completed_by)) || 'Unknown') : null,
+                site_visit_project_id: a.site_visit_project_id || null,
+                site_visit_project_name: a.site_visit_project_name || null,
+                createdAt: a.createdAt ? new Date(a.createdAt).toISOString() : '',
+            }));
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to fetch site visit calendar data: ' + err.message, 500);
         }
     }
 }

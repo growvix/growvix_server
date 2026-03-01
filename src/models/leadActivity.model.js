@@ -16,7 +16,9 @@ const LeadActivitySchema = new Schema(
         site_visit_date: { type: Date, required: false },
         site_visit_completed: { type: Boolean, default: false },
         site_visit_completed_at: { type: Date, default: null },
-        site_visit_completed_by: { type: String, default: null }
+        site_visit_completed_by: { type: String, default: null },
+        site_visit_project_id: { type: Number, default: null },
+        site_visit_project_name: { type: String, default: null }
     },
     {
         timestamps: true,

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authController } from '../controllers/auth.controller.js';
 import { validate } from '../middleware/validate.middleware.js';
-import { registerSchema, loginSchema } from '../validations/auth.validation.js';
+import { registerSchema, loginSchema, cploginSchema } from '../validations/auth.validation.js';
 
 const router = Router();
 
@@ -97,5 +97,61 @@ router.post('/register', validate(registerSchema), authController.register);
  *         description: Invalid credentials
  */
 router.post('/login', validate(loginSchema), authController.login);
+
+/**
+ * @swagger
+ * /api/auth/cplogin:
+ *   post:
+ *     summary: Login Channel Partner user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                     profile_id:
+ *                       type: number
+ *                     organization:
+ *                       type: string
+ *                     firstName:
+ *                       type: string
+ *                     lastName:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     token:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *       401:
+ *         description: Invalid credentials
+ */
+router.post('/Cplogin', validate(cploginSchema), authController.cplogin);
 
 export default router;

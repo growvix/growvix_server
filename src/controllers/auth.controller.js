@@ -26,6 +26,24 @@ export class AuthController {
 
         res.status(200).json(ApiResponse.success('Login successful', responseData));
     });
+    cplogin = asyncHandler(async (req, res) => {
+        const result = await authService.cplogin(req.body);
+
+        // Flatten response as requested
+        const responseData = {
+            user_id: result.user_id,
+            profile_id: result.profile_id,
+            organization: result.organization,
+            firstName: result.firstName,
+            lastName: result.lastName,
+            email: result.email,
+            token: result.token,
+            role: result.role,
+            permissions: result.permissions || []
+        };
+
+        res.status(200).json(ApiResponse.success('Login successful', responseData));
+    });
 }
 
 export const authController = new AuthController();

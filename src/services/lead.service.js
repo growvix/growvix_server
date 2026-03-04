@@ -64,8 +64,19 @@ export class LeadService {
             if (filters.campaign) {
                 query['acquired.campaign'] = { $regex: filters.campaign, $options: 'i' };
             }
-            if (filters.status) {
+            if (filters.status && filters.status !== 'undefined') {
                 query['status'] = filters.status;
+            }
+            if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
+                query['exe_user'] = filters.assignedTo;
+            }
+            if (filters.receivedOn && filters.receivedOn !== 'undefined') {
+                const searchDate = new Date(filters.receivedOn);
+                if (!isNaN(searchDate.getTime())) {
+                    const nextDate = new Date(searchDate);
+                    nextDate.setDate(nextDate.getDate() + 1);
+                    query['acquired.received'] = { $gte: searchDate, $lt: nextDate };
+                }
             }
 
             const leads = await Lead.find(query).lean();

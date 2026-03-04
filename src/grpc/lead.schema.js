@@ -7,10 +7,13 @@ export const LeadSchema = {
     _id: '',
     profileId: '',
     name: '',
+    stage: '',
+    status: '',
     campaign: '',
     source: '',
     subSource: '',
-    received: ''
+    received: '',
+    exeUserName: '',
 };
 
 // Service methods implementation

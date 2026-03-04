@@ -54,6 +54,24 @@ const router = Router();
  *     responses:
  *       201:
  *         description: Lead added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     profile_id:
+ *                       type: integer
+ *                     exe_user:
+ *                       type: string
  *       400:
  *         description: Validation error
  */
@@ -117,6 +135,8 @@ router.get('/stages/:organization', leadStageController.getStages);
  *                     profile_id:
  *                       type: integer
  *                     name:
+ *                       type: string
+ *                     exe_user:
  *                       type: string
  *       404:
  *         description: Lead not found

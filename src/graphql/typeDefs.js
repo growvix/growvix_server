@@ -29,6 +29,21 @@ export const typeDefs = `#graphql
         type: [String]
     }
 
+    type LeadPropertyRequirement {
+        sqft: Int
+        bhk: [String]
+        floor: [String]
+        balcony: Boolean
+        bathroom_count: Int
+        parking_needed: Boolean
+        parking_count: Int
+        price_min: Float
+        price_max: Float
+        furniture: [String]
+        facing: [String]
+        plot_type: String
+    }
+
     type LeadAcquired {
         campaign: String
         source: String
@@ -39,6 +54,24 @@ export const typeDefs = `#graphql
         _id: String
     }
 
+    type LeadRequirement {
+        _id: String!
+        key: String!
+        value: String!
+    }
+
+    type InterestedProject {
+        project_id: Int!
+        project_name: String!
+    }
+
+    type ProjectSummary {
+        product_id: Int!
+        name: String!
+        location: String
+        property: String
+    }
+
     type LeadDetail {
         _id: String!
         profile_id: Int!
@@ -46,12 +79,10 @@ export const typeDefs = `#graphql
         profile: LeadProfile
         prefered: LeadPrefered
         pretype: LeadPretype
-        bathroom: Int
-        parking: Int
+        propertyRequirement: LeadPropertyRequirement
         
         project: [String]
-        floor: String
-        facing: String
+        interested_projects: [InterestedProject]
         merge_id: [String]
         acquired: [LeadAcquired]
         stage: String
@@ -60,7 +91,9 @@ export const typeDefs = `#graphql
         exe_user_name: String
         createdAt: String
         updatedAt: String
+        site_visits_completed: Int
         activities: [LeadActivity!]!
+        requirements: [LeadRequirement!]!
     }
 
     type LeadActivity {
@@ -72,12 +105,35 @@ export const typeDefs = `#graphql
         updates: String
         stage: String
         site_visit_date: String
+        site_visit_completed: Boolean
+        site_visit_completed_at: String
+        site_visit_completed_by: String
+        site_visit_completed_by_name: String
+        site_visit_project_id: Int
+        site_visit_project_name: String
         status: String
         notes: String
         reason: String
         follow_up_date: String
         createdAt: String
         updatedAt: String
+    }
+
+    type SiteVisitCalendarEntry {
+        id: String!
+        lead_id: String!
+        lead_name: String
+        profile_id: Int!
+        user_id: String!
+        user_name: String
+        site_visit_date: String!
+        site_visit_completed: Boolean!
+        site_visit_completed_at: String
+        site_visit_completed_by: String
+        site_visit_completed_by_name: String
+        site_visit_project_id: Int
+        site_visit_project_name: String
+        createdAt: String
     }
 
     input CreateLeadActivityInput {
@@ -88,6 +144,8 @@ export const typeDefs = `#graphql
         reason: String
         stage: String
         site_visit_date: String
+        site_visit_project_id: Int
+        site_visit_project_name: String
         status: String
         notes: String
         follow_up_date: String
@@ -98,6 +156,8 @@ export const typeDefs = `#graphql
         getLeadById(organization: String!, id: String!): LeadDetail
         getLeadActivities(organization: String!, leadId: String!): [LeadActivity!]!
         getLeadActivitiesByProfileId(organization: String!, profileId: Int!): [LeadActivity!]!
+        getSiteVisitActivities(organization: String!, startDate: String, endDate: String, userId: String, teamId: String, projectId: Int): [SiteVisitCalendarEntry!]!
+        getAllProjects(organization: String!): [ProjectSummary!]!
     }
 
     input UpdateLeadInput {
@@ -105,9 +165,30 @@ export const typeDefs = `#graphql
         status: String
         exe_user: String
     }
+
+    input UpdatePropertyRequirementInput {
+        sqft: Int
+        bhk: [String]
+        floor: [String]
+        balcony: Boolean
+        bathroom_count: Int
+        parking_needed: Boolean
+        parking_count: Int
+        price_min: Float
+        price_max: Float
+        furniture: [String]
+        facing: [String]
+        plot_type: String
+    }
  
     type Mutation {
         createLeadActivity(organization: String!, input: CreateLeadActivityInput!): LeadActivity!
         updateLead(organization: String!, id: String!, input: UpdateLeadInput!): LeadDetail
+        markSiteVisitCompleted(organization: String!, activityId: String!, userId: String!): LeadActivity!
+        addRequirement(organization: String!, leadId: String!, key: String!, value: String!): LeadDetail
+        removeRequirement(organization: String!, leadId: String!, requirementId: String!): LeadDetail
+        updatePropertyRequirement(organization: String!, leadId: String!, input: UpdatePropertyRequirementInput!): LeadDetail
+        addInterestedProject(organization: String!, leadId: String!, projectId: Int!, projectName: String!): LeadDetail
+        removeInterestedProject(organization: String!, leadId: String!, projectId: Int!): LeadDetail
     }
 `;

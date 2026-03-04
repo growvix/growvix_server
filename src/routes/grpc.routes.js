@@ -21,6 +21,12 @@ const router = Router();
  *               organization:
  *                 type: string
  *                 description: Organization name
+ *               offset:
+ *                 type: integer
+ *                 description: Number of records to skip (default 0)
+ *               limit:
+ *                 type: integer
+ *                 description: Maximum records to return (default 30)
  *               filters:
  *                 type: object
  *                 description: Optional filters
@@ -49,6 +55,9 @@ const router = Router();
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/LeadListItem'
+ *                 total:
+ *                   type: integer
+ *                   description: Total number of matching leads
  *       400:
  *         description: Failed to fetch leads
  */

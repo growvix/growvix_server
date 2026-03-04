@@ -13,7 +13,12 @@ const LeadActivitySchema = new Schema(
         status: { type: String, required: false },
         notes: { type: String, required: false },
         follow_up_date: { type: Date, required: false },
-        site_visit_date: { type: Date, required: false }
+        site_visit_date: { type: Date, required: false },
+        site_visit_completed: { type: Boolean, default: false },
+        site_visit_completed_at: { type: Date, default: null },
+        site_visit_completed_by: { type: String, default: null },
+        site_visit_project_id: { type: Number, default: null },
+        site_visit_project_name: { type: String, default: null }
     },
     {
         timestamps: true,

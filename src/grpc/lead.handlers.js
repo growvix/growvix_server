@@ -5,17 +5,18 @@ import { getClientUserModel } from '../models/clientUser.model.js';
 
 /**
  * GetAllLeads handler for Connect RPC
- * @param {Object} req - Request object containing organization
- * @returns {Object} Response with leads array
+ * @param {Object} req - Request object containing organization, filters, offset, limit
+ * @returns {Object} Response with leads array and total count
  */
 export async function getAllLeads(req) {
-    const { organization, filters } = req;
+    const { organization, filters, offset = 0, limit = 30 } = req;
 
     if (!organization) {
         throw new Error('Organization is required');
     }
 
-    const leads = await leadService.getAllLeads(organization, filters || {});
+    const result = await leadService.getAllLeads(organization, filters || {}, { offset, limit });
+    const { leads, total } = result;
 
     // Batch-resolve exe_user_name
     let userMap = {};
@@ -38,13 +39,16 @@ export async function getAllLeads(req) {
             lead_id: lead.lead_id,
             profile_id: lead.profile_id,
             name: lead.name || '',
+            stage: lead.stage || '',
+            status: lead.status || '',
             campaign: lead.campaign || '',
             source: lead.source || '',
             sub_source: lead.sub_source || '',
             received: lead.received || '',
             exe_user: lead.exe_user || '',
             exe_user_name: lead.exe_user ? (userMap[lead.exe_user] || '') : '',
-        }))
+        })),
+        total,
     };
 }
 

@@ -205,6 +205,77 @@ export class ProjectService {
         }
     }
 
+    async bookUnit(organization, productId, { blockId, unitId, plotId, leadName, leadUuid, phone }) {
+        if (!organization) {
+            throw new AppError('Organization is required', 400);
+        }
+        if (!productId) {
+            throw new AppError('Project ID is required', 400);
+        }
+        if (!leadName || !leadUuid || !phone) {
+            throw new AppError('Lead name, UUID, and phone are required', 400);
+        }
+
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Project = getProjectModel(orgConn);
+            const project = await Project.findOne({ product_id: parseInt(productId) });
+
+            if (!project) {
+                throw new AppError('Project not found', 404);
+            }
+
+            // Plot booking
+            if (plotId) {
+                const plot = project.plots?.find(p => p.plotId === plotId);
+                if (!plot) {
+                    throw new AppError('Plot not found', 404);
+                }
+                if (plot.status !== 'available') {
+                    throw new AppError(`Plot ${plot.plotNumber} is not available (current status: ${plot.status})`, 400);
+                }
+                plot.status = 'booked';
+                plot.bookedBy = { leadName, leadUuid, phone };
+                await project.save();
+                return { type: 'plot', item: plot };
+            }
+
+            // Unit booking
+            if (blockId && unitId) {
+                const block = project.blocks?.find(b => b.blockId === blockId);
+                if (!block) {
+                    throw new AppError('Block not found', 404);
+                }
+
+                let targetUnit = null;
+                for (const floor of block.floors) {
+                    const unit = floor.units?.find(u => u.unitId === unitId);
+                    if (unit) {
+                        targetUnit = unit;
+                        break;
+                    }
+                }
+
+                if (!targetUnit) {
+                    throw new AppError('Unit not found', 404);
+                }
+                if (targetUnit.status !== 'available') {
+                    throw new AppError(`Unit ${targetUnit.unitNumber} is not available (current status: ${targetUnit.status})`, 400);
+                }
+
+                targetUnit.status = 'booked';
+                targetUnit.bookedBy = { leadName, leadUuid, phone };
+                await project.save();
+                return { type: 'unit', item: targetUnit };
+            }
+
+            throw new AppError('Either plotId or blockId+unitId must be provided', 400);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to book unit: ' + err.message, 500);
+        }
+    }
+
     async updateProject(organization, productId, updateData) {
         if (!organization) {
             throw new AppError('Organization is required', 400);

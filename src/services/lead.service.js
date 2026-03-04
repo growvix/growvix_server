@@ -45,13 +45,17 @@ export class LeadService {
         }
     }
 
-    async getAllLeads(organization, filters = {}) {
+    async getAllLeads(organization, filters = {}, { offset = 0, limit = 30 } = {}) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
         try {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
+
+            // Sanitize pagination params
+            const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
+            const safeLimit = Math.max(1, parseInt(limit, 10) || 30);
 
             // Build query from filters
             const query = {};
@@ -76,11 +80,30 @@ export class LeadService {
                     const nextDate = new Date(searchDate);
                     nextDate.setDate(nextDate.getDate() + 1);
                     query['acquired.received'] = { $gte: searchDate, $lt: nextDate };
+            if (filters.stage) {
+                query['stage'] = filters.stage;
+            }
+            if (filters.assignedTo) {
+                query['exe_user'] = filters.assignedTo;
+            }
+            if (filters.receivedOn) {
+                const date = new Date(filters.receivedOn);
+                if (!isNaN(date.getTime())) {
+                    const startOfDay = new Date(date);
+                    startOfDay.setHours(0, 0, 0, 0);
+                    const endOfDay = new Date(date);
+                    endOfDay.setHours(23, 59, 59, 999);
+                    query['acquired.received'] = { $gte: startOfDay, $lte: endOfDay };
                 }
             }
 
-            const leads = await Lead.find(query).lean();
-            return leads.map(lead => {
+            // Run count and paginated query in parallel
+            const [total, leads] = await Promise.all([
+                Lead.countDocuments(query),
+                Lead.find(query).skip(safeOffset).limit(safeLimit).lean(),
+            ]);
+
+            const mappedLeads = leads.map(lead => {
                 const receivedValue = lead.acquired?.[0]?.received;
                 let receivedStr = '';
                 if (receivedValue) {
@@ -92,6 +115,8 @@ export class LeadService {
                     lead_id: lead._id.toString(),
                     profile_id: lead.profile_id,
                     name: lead.profile?.name || '',
+                    stage: lead.stage || '',
+                    status: lead.status || '',
                     campaign: lead.acquired?.[0]?.campaign || '',
                     source: lead.acquired?.[0]?.source || '',
                     sub_source: lead.acquired?.[0]?.sub_source || '',
@@ -99,6 +124,8 @@ export class LeadService {
                     exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 };
             });
+
+            return { leads: mappedLeads, total };
         } catch (err) {
             throw new AppError('Failed to fetch leads: ' + err.message, 500);
         }
@@ -156,13 +183,32 @@ export class LeadService {
                 status: lead.status,
                 prefered: lead.prefered || null,
                 pretype: lead.pretype || null,
-                bathroom: lead.bathroom || 0,
-                parking: lead.parking || 0,
+                propertyRequirement: lead.requirement ? {
+                    sqft: lead.requirement.sqft || null,
+                    bhk: lead.requirement.bhk || [],
+                    floor: lead.requirement.floor || [],
+                    balcony: lead.requirement.balcony || false,
+                    bathroom_count: lead.requirement.bathroom_count || null,
+                    parking_needed: lead.requirement.parking_needed || false,
+                    parking_count: lead.requirement.parking_count || null,
+                    price_min: lead.requirement.price_min || null,
+                    price_max: lead.requirement.price_max || null,
+                    furniture: lead.requirement.furniture || [],
+                    facing: lead.requirement.facing || [],
+                    plot_type: lead.requirement.plot_type || '',
+                } : null,
                 project: lead.project || [],
-                floor: lead.floor || '',
-                facing: lead.facing || '',
+                interested_projects: (lead.interested_projects || []).map(ip => ({
+                    project_id: ip.project_id,
+                    project_name: ip.project_name,
+                })),
                 merge_id: lead.merge_id || [],
                 acquired: transformAcquired(lead.acquired),
+                requirements: (lead.requirements || []).map(r => ({
+                    _id: r._id?.toString() || '',
+                    key: r.key,
+                    value: r.value,
+                })),
                 exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',
                 updatedAt: lead.updatedAt ? new Date(lead.updatedAt).toISOString() : '',
@@ -236,6 +282,121 @@ export class LeadService {
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to update lead: ' + err.message, 500);
+        }
+    }
+
+    async addRequirement(organization, leadId, key, value) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!key || !value) throw new AppError('Key and value are required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+            const lead = await Lead.findByIdAndUpdate(
+                leadId,
+                { $push: { requirements: { key, value } } },
+                { new: true }
+            ).lean();
+            if (!lead) throw new AppError('Lead not found', 404);
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to add requirement: ' + err.message, 500);
+        }
+    }
+
+    async removeRequirement(organization, leadId, requirementId) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!requirementId) throw new AppError('Requirement ID is required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+            const lead = await Lead.findByIdAndUpdate(
+                leadId,
+                { $pull: { requirements: { _id: requirementId } } },
+                { new: true }
+            ).lean();
+            if (!lead) throw new AppError('Lead not found', 404);
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to remove requirement: ' + err.message, 500);
+        }
+    }
+
+    async updatePropertyRequirement(organization, leadId, input) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            const setFields = {};
+            for (const [key, value] of Object.entries(input)) {
+                setFields[`requirement.${key}`] = value;
+            }
+
+            const lead = await Lead.findByIdAndUpdate(
+                leadId,
+                { $set: setFields },
+                { new: true }
+            ).lean();
+            if (!lead) throw new AppError('Lead not found', 404);
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to update property requirement: ' + err.message, 500);
+        }
+    }
+
+    async addInterestedProject(organization, leadId, projectId, projectName) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!projectId) throw new AppError('Project ID is required', 400);
+        if (!projectName) throw new AppError('Project name is required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            // Use $addToSet to prevent duplicates (match by project_id)
+            // First check if project already exists
+            const existing = await Lead.findOne({
+                _id: leadId,
+                'interested_projects.project_id': projectId
+            }).lean();
+            if (existing) {
+                throw new AppError('Project already added to this lead', 400);
+            }
+
+            await Lead.findByIdAndUpdate(
+                leadId,
+                { $push: { interested_projects: { project_id: projectId, project_name: projectName } } },
+                { new: true }
+            );
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to add interested project: ' + err.message, 500);
+        }
+    }
+
+    async removeInterestedProject(organization, leadId, projectId) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!projectId) throw new AppError('Project ID is required', 400);
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+            await Lead.findByIdAndUpdate(
+                leadId,
+                { $pull: { interested_projects: { project_id: projectId } } },
+                { new: true }
+            );
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to remove interested project: ' + err.message, 500);
         }
     }
 }

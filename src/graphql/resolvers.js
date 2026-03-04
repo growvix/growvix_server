@@ -1,6 +1,7 @@
 // GraphQL Resolvers
 import { leadService } from '../services/lead.service.js';
 import { leadActivityService } from '../services/leadActivity.service.js';
+import { projectService } from '../services/project.service.js';
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getClientUserModel } from '../models/clientUser.model.js';
 
@@ -39,6 +40,18 @@ export const resolvers = {
         getLeadActivitiesByProfileId: async (_, { organization, profileId }) => {
             return await leadActivityService.getActivitiesByProfileId(organization, profileId);
         },
+        getSiteVisitActivities: async (_, { organization, startDate, endDate, userId, teamId, projectId }) => {
+            return await leadActivityService.getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId });
+        },
+        getAllProjects: async (_, { organization }) => {
+            const projects = await projectService.getAllProjects(organization);
+            return projects.map(p => ({
+                product_id: p.product_id,
+                name: p.name,
+                location: p.location || null,
+                property: p.property || null,
+            }));
+        },
     },
     Mutation: {
         createLeadActivity: async (_, { organization, input }) => {
@@ -47,11 +60,33 @@ export const resolvers = {
         updateLead: async (_, { organization, id, input }) => {
             return await leadService.updateLead(organization, id, input);
         },
+        markSiteVisitCompleted: async (_, { organization, activityId, userId }) => {
+            return await leadActivityService.markSiteVisitCompleted(organization, activityId, userId);
+        },
+        addRequirement: async (_, { organization, leadId, key, value }) => {
+            return await leadService.addRequirement(organization, leadId, key, value);
+        },
+        removeRequirement: async (_, { organization, leadId, requirementId }) => {
+            return await leadService.removeRequirement(organization, leadId, requirementId);
+        },
+        updatePropertyRequirement: async (_, { organization, leadId, input }) => {
+            return await leadService.updatePropertyRequirement(organization, leadId, input);
+        },
+        addInterestedProject: async (_, { organization, leadId, projectId, projectName }) => {
+            return await leadService.addInterestedProject(organization, leadId, projectId, projectName);
+        },
+        removeInterestedProject: async (_, { organization, leadId, projectId }) => {
+            return await leadService.removeInterestedProject(organization, leadId, projectId);
+        },
     },
     LeadDetail: {
         activities: async (parent, _, context) => {
             // parent contains the LeadDetail object with organization and profile_id
             return await leadActivityService.getActivitiesByProfileId(parent.organization, parent.profile_id);
+        },
+        site_visits_completed: async (parent) => {
+            const activities = await leadActivityService.getActivitiesByProfileId(parent.organization, parent.profile_id);
+            return activities.filter(a => a.updates === 'site_visit' && a.site_visit_completed).length;
         },
         exe_user_name: async (parent) => {
             if (!parent.exe_user || !parent.organization) return '';

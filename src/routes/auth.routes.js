@@ -31,6 +31,9 @@ const router = Router();
  *                 format: password
  *               organization:
  *                 type: string
+ *               department:
+ *                 type: string
+ *                 enum: [pre-sales, sales, post-sales]
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -74,6 +77,8 @@ router.post('/register', validate(registerSchema), authController.register);
  *                 data:
  *                   type: object
  *                   properties:
+ *                     user_id:
+ *                       type: string
  *                     profile_id:
  *                       type: number
  *                     organization:

@@ -74,19 +74,10 @@ export class LeadService {
             if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
                 query['exe_user'] = filters.assignedTo;
             }
-            if (filters.receivedOn && filters.receivedOn !== 'undefined') {
-                const searchDate = new Date(filters.receivedOn);
-                if (!isNaN(searchDate.getTime())) {
-                    const nextDate = new Date(searchDate);
-                    nextDate.setDate(nextDate.getDate() + 1);
-                    query['acquired.received'] = { $gte: searchDate, $lt: nextDate };
-            if (filters.stage) {
+            if (filters.stage && filters.stage !== 'undefined') {
                 query['stage'] = filters.stage;
             }
-            if (filters.assignedTo) {
-                query['exe_user'] = filters.assignedTo;
-            }
-            if (filters.receivedOn) {
+            if (filters.receivedOn && filters.receivedOn !== 'undefined') {
                 const date = new Date(filters.receivedOn);
                 if (!isNaN(date.getTime())) {
                     const startOfDay = new Date(date);

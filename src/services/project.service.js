@@ -116,6 +116,7 @@ export class ProjectService {
                         name: 1,
                         location: 1,
                         property: 1,
+                        img_location: 1,
                         createdAt: 1,
                         blockCount: { $size: { $ifNull: ['$blocks', []] } },
                         plotCount: { $size: { $ifNull: ['$plots', []] } },

@@ -50,6 +50,7 @@ export const resolvers = {
                 name: p.name,
                 location: p.location || null,
                 property: p.property || null,
+                img_location: p.img_location || null,
             }));
         },
     },

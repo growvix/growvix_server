@@ -65,11 +65,20 @@ export const typeDefs = `#graphql
         project_name: String!
     }
 
+    type ProjectImageLocation {
+        logo: String
+        banner: String
+        brochure: String
+        post: String
+        videos: String
+    }
+
     type ProjectSummary {
         product_id: Int!
         name: String!
         location: String
         property: String
+        img_location: ProjectImageLocation
     }
 
     type LeadDetail {

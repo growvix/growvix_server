@@ -22,6 +22,7 @@ const UnitSchema = new Schema({
     bookedBy: {
         leadName: { type: String },
         leadUuid: { type: String },
+        profileId: { type: Number },  // Lead's profile_id
         phone: { type: String },
         userId: { type: String },    // Added: Who booked it
         userName: { type: String },  // Added: Name of user who booked it
@@ -62,6 +63,7 @@ const PlotSchema = new Schema({
     bookedBy: {
         leadName: { type: String },
         leadUuid: { type: String },
+        profileId: { type: Number },  // Lead's profile_id
         phone: { type: String },
         userId: { type: String },    // Added: Who booked it
         userName: { type: String },  // Added: Name of user who booked it

@@ -38,14 +38,14 @@ export class ProjectController {
     bookUnit = asyncHandler(async (req, res) => {
         const organization = req.body.organization;
         const { id } = req.params;
-        const { blockId, unitId, plotId, leadName, leadUuid, phone, userId, userName } = req.body;
+        const { blockId, unitId, plotId, leadName, leadUuid, profileId, phone, userId, userName } = req.body;
 
         // Use auth user details if not provided in body (fallback)
         const finalUserId = userId || (req.user ? req.user.id : undefined);
         const finalUserName = userName || (req.user ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() : undefined);
 
         const result = await projectService.bookUnit(organization, id, {
-            blockId, unitId, plotId, leadName, leadUuid, phone,
+            blockId, unitId, plotId, leadName, leadUuid, profileId, phone,
             userId: finalUserId,
             userName: finalUserName
         });

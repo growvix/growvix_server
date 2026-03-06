@@ -253,7 +253,7 @@ export class ProjectService {
         }
     }
 
-    async bookUnit(organization, productId, { blockId, unitId, plotId, leadName, leadUuid, phone, userId, userName }) {
+    async bookUnit(organization, productId, { blockId, unitId, plotId, leadName, leadUuid, profileId, phone, userId, userName }) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -283,7 +283,7 @@ export class ProjectService {
                     throw new AppError(`Plot ${plot.plotNumber} is not available (current status: ${plot.status})`, 400);
                 }
                 plot.status = 'booked';
-                plot.bookedBy = { leadName, leadUuid, phone, userId, userName, bookedAt: new Date() };
+                plot.bookedBy = { leadName, leadUuid, profileId, phone, userId, userName, bookedAt: new Date() };
                 await project.save();
                 return { type: 'plot', item: plot };
             }
@@ -312,7 +312,7 @@ export class ProjectService {
                 }
 
                 targetUnit.status = 'booked';
-                targetUnit.bookedBy = { leadName, leadUuid, phone, userId, userName, bookedAt: new Date() };
+                targetUnit.bookedBy = { leadName, leadUuid, profileId, phone, userId, userName, bookedAt: new Date() };
                 await project.save();
                 return { type: 'unit', item: targetUnit };
             }

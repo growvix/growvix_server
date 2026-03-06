@@ -1,5 +1,6 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getProjectModel } from '../models/project.model.js';
+import { getLeadModel } from '../models/lead.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 
 export class ProjectService {
@@ -407,6 +408,23 @@ export class ProjectService {
                 }
             }
 
+            // Fetch missing profileIds from Leads
+            const leadModel = getLeadModel(orgConn);
+
+            for (let i = 0; i < bookedItems.length; i++) {
+                const item = bookedItems[i];
+                if (item.bookedBy && item.bookedBy.leadUuid && !item.bookedBy.profileId) {
+                    try {
+                        const lead = await leadModel.findOne({ _id: item.bookedBy.leadUuid }).select('profile_id');
+                        if (lead) {
+                            item.bookedBy.profileId = lead.profile_id;
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching lead profile ID for UUID ${item.bookedBy.leadUuid}:`, error.message);
+                    }
+                }
+            }
+
             // Sort by booking date descending if available
             bookedItems.sort((a, b) => {
                 const dateA = a.bookedBy?.bookedAt ? new Date(a.bookedBy.bookedAt).getTime() : 0;
@@ -497,6 +515,23 @@ export class ProjectService {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Fetch missing profileIds from Leads
+            const leadModel = getLeadModel(orgConn);
+
+            for (let i = 0; i < bookedItems.length; i++) {
+                const item = bookedItems[i];
+                if (item.bookedBy && item.bookedBy.leadUuid && !item.bookedBy.profileId) {
+                    try {
+                        const lead = await leadModel.findOne({ _id: item.bookedBy.leadUuid }).select('profile_id');
+                        if (lead) {
+                            item.bookedBy.profileId = lead.profile_id;
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching lead profile ID for UUID ${item.bookedBy.leadUuid}:`, error.message);
                     }
                 }
             }

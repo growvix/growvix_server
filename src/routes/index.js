@@ -8,6 +8,7 @@ import teamRoutes from './team.routes.js';
 import cpUserRoutes from './cpUser.routes.js';
 import cpTeamRoutes from './cpTeam.routes.js';
 import ivrRoutes from './ivr.routes.js';
+import mailRoutes from './mail.routes.js';
 
 
 const router = Router();
@@ -21,5 +22,6 @@ router.use('/teams', teamRoutes);
 router.use('/cp-users', cpUserRoutes);
 router.use('/cp-teams', cpTeamRoutes);
 router.use('/ivr-call', ivrRoutes);
+router.use('/mail', mailRoutes);
 
 export default router;

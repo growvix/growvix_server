@@ -2,6 +2,7 @@
 import { leadService } from '../services/lead.service.js';
 import { leadActivityService } from '../services/leadActivity.service.js';
 import { projectService } from '../services/project.service.js';
+import { leadStageService } from '../services/leadStage.service.js';
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getClientUserModel } from '../models/clientUser.model.js';
 
@@ -51,6 +52,29 @@ export const resolvers = {
                 location: p.location || null,
                 property: p.property || null,
                 img_location: p.img_location || null,
+            }));
+        },
+        getLeadStages: async (_, { organization }) => {
+            const result = await leadStageService.getStages(organization);
+            return {
+                stages: (result?.stages || []).map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    color: s.color,
+                    nextStages: s.nextStages || [],
+                })),
+            };
+        },
+        getOrganizationUsers: async (_, { organization }) => {
+            const orgConn = await getOrganizationConnection(organization);
+            const ClientUser = getClientUserModel(orgConn);
+            const users = await ClientUser.find({ isActive: true }).lean();
+            return users.map(u => ({
+                _id: u._id?.toString() || '',
+                globalUserId: u.globalUserId?.toString() || '',
+                profile: u.profile || null,
+                role: u.role || 'user',
+                isActive: u.isActive ?? true,
             }));
         },
     },

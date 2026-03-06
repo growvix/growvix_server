@@ -145,6 +145,32 @@ export const typeDefs = `#graphql
         createdAt: String
     }
 
+    type LeadStage {
+        id: Int!
+        name: String!
+        color: String!
+        nextStages: [Int!]
+    }
+
+    type LeadStageConfig {
+        stages: [LeadStage!]!
+    }
+
+    type OrgUserProfile {
+        firstName: String
+        lastName: String
+        email: String
+        phone: String
+    }
+
+    type OrgUser {
+        _id: String!
+        globalUserId: String
+        profile: OrgUserProfile
+        role: String
+        isActive: Boolean
+    }
+
     input CreateLeadActivityInput {
         profile_id: Int!
         lead_id: String!
@@ -167,6 +193,8 @@ export const typeDefs = `#graphql
         getLeadActivitiesByProfileId(organization: String!, profileId: Int!): [LeadActivity!]!
         getSiteVisitActivities(organization: String!, startDate: String, endDate: String, userId: String, teamId: String, projectId: Int): [SiteVisitCalendarEntry!]!
         getAllProjects(organization: String!): [ProjectSummary!]!
+        getLeadStages(organization: String!): LeadStageConfig
+        getOrganizationUsers(organization: String!): [OrgUser!]!
     }
 
     input UpdateLeadInput {

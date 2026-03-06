@@ -38,11 +38,41 @@ export class ProjectController {
     bookUnit = asyncHandler(async (req, res) => {
         const organization = req.body.organization;
         const { id } = req.params;
-        const { blockId, unitId, plotId, leadName, leadUuid, phone } = req.body;
+        const { blockId, unitId, plotId, leadName, leadUuid, phone, userId, userName } = req.body;
+
+        // Use auth user details if not provided in body (fallback)
+        const finalUserId = userId || (req.user ? req.user.id : undefined);
+        const finalUserName = userName || (req.user ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() : undefined);
+
         const result = await projectService.bookUnit(organization, id, {
-            blockId, unitId, plotId, leadName, leadUuid, phone
+            blockId, unitId, plotId, leadName, leadUuid, phone,
+            userId: finalUserId,
+            userName: finalUserName
         });
         res.status(200).json(ApiResponse.success('Unit booked successfully', result));
+    });
+
+    getProjectBookedUnits = asyncHandler(async (req, res) => {
+        const organization = req.query.organization;
+        const { id } = req.params;
+        const bookedUnits = await projectService.getProjectBookedUnits(organization, id);
+        res.status(200).json(ApiResponse.success('Project booked units fetched successfully', bookedUnits));
+    });
+
+    getAllBookedUnits = asyncHandler(async (req, res) => {
+        const organization = req.query.organization;
+
+        // Extract filters from query parameters
+        const filters = {
+            startDate: req.query.startDate,
+            endDate: req.query.endDate,
+            userId: req.query.userId,
+            teamId: req.query.teamId,
+            projectId: req.query.projectId
+        };
+
+        const bookedUnits = await projectService.getAllBookedUnits(organization, filters);
+        res.status(200).json(ApiResponse.success('All booked units fetched successfully', bookedUnits));
     });
 }
 

@@ -69,6 +69,24 @@ router.get('/', projectController.getAllProjects);
 
 /**
  * @swagger
+ * /api/projects/booked/all:
+ *   get:
+ *     summary: Get all booked units across all projects
+ *     tags: [Projects]
+ *     parameters:
+ *       - in: query
+ *         name: organization
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: All booked units fetched successfully
+ */
+router.get('/booked/all', projectController.getAllBookedUnits);
+
+/**
+ * @swagger
  * /api/projects/{id}:
  *   get:
  *     summary: Get project by ID
@@ -91,6 +109,31 @@ router.get('/', projectController.getAllProjects);
  *         description: Project not found
  */
 router.get('/:id', projectController.getProjectById);
+
+/**
+ * @swagger
+ * /api/projects/{id}/booked:
+ *   get:
+ *     summary: Get booked units for a specific project
+ *     tags: [Projects]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: organization
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Project booked units fetched successfully
+ *       404:
+ *         description: Project not found
+ */
+router.get('/:id/booked', projectController.getProjectBookedUnits);
 
 /**
  * @swagger

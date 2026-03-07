@@ -91,7 +91,7 @@ export class LeadService {
             // Run count and paginated query in parallel
             const [total, leads] = await Promise.all([
                 Lead.countDocuments(query),
-                Lead.find(query).skip(safeOffset).limit(safeLimit).lean(),
+                Lead.find(query).sort({ profile_id: -1 }).skip(safeOffset).limit(safeLimit).lean(),
             ]);
 
             const mappedLeads = leads.map(lead => {

@@ -2,6 +2,7 @@ import mongoose, { Schema } from 'mongoose';
 
 const LeadSchema = new Schema(
     {
+        _id: { type: Schema.Types.UUID },
         profile_id: { type: Number, required: true, unique: true },
         organization: { type: String, required: true },
         profile: {
@@ -11,14 +12,28 @@ const LeadSchema = new Schema(
             location: { type: String },
         },
         requirement: {
-            location: { type: String },
-            budget: { type: String },
-            bathroom: { type: Number },
-            parking: { type: Number },
-            floor: { type: String },
-            facing: { type: String },
+            sqft: { type: Number },
+            bhk: [{ type: String }],
+            floor: [{ type: String }],
+            balcony: { type: Boolean, default: false },
+            bathroom_count: { type: Number },
+            parking_needed: { type: Boolean, default: false },
+            parking_count: { type: Number },
+            price_min: { type: Number },
+            price_max: { type: Number },
+            furniture: [{ type: String }],
+            facing: [{ type: String }],
+            plot_type: { type: String },
         },
+        requirements: [{
+            key: { type: String, required: true },
+            value: { type: String, required: true },
+        }],
         project: [{ type: String }],
+        interested_projects: [{
+            project_id: { type: Number, required: true },
+            project_name: { type: String, required: true }
+        }],
         engaged: { type: Object },
         merge_id: [{ type: String }],
         acquired: [{
@@ -30,8 +45,10 @@ const LeadSchema = new Schema(
             medium: { type: String },
         }],
         stage: { type: String },
+        status: { type: String },
         created_at: { type: Date },
         updated_at: { type: Date },
+        exe_user: { type: Schema.Types.UUID },
     },
     {
         timestamps: true,

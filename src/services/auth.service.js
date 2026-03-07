@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { User } from '../models/user.model.js';
+import { GlobalCpUser } from '../models/cpUser.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import { hashPassword, comparePassword, signToken } from '../utils/security.util.js';
 const { getOrganizationConnection } = await import('../config/multiTenantDb.js');
@@ -48,6 +49,8 @@ export class AuthService {
                 globalUserId: user._id,
                 profile: user.profile,
                 role: user.role,
+                department: user.department,
+                permissions: user.permissions || [],
                 isActive: true
             };
             await ClientUser.create(clientUserData);
@@ -89,12 +92,52 @@ export class AuthService {
         return {
             user: userObj,
             token,
+            user_id: user._id.toString(),
             profile_id: user.profile_id,
             organization: user.organization,
             firstName: user.profile.firstName,
             lastName: user.profile.lastName,
             email: user.profile.email,
-            role: user.role
+            role: user.role,
+            permissions: user.permissions || []
+        };
+    }
+    async cplogin(data) {
+        const { email, password } = data;
+
+        if (!email || !password) {
+            throw new AppError('Please provide email and password', 400);
+        }
+
+        // Find by profile.email
+        const user = await GlobalCpUser.findOne({ 'profile.email': email }).select('+password');
+        if (!user || !user.password) {
+            throw new AppError('Invalid credentials', 401);
+        }
+
+        const isMatch = await comparePassword(password, user.password);
+        if (!isMatch) {
+            throw new AppError('Invalid credentials', 401);
+        }
+
+        const role = user.role || 'cp_user'; // Provide a default role for CP users
+        const token = signToken(user._id, role);
+
+        const userObj = user.toObject();
+        delete userObj.password;
+
+        // Return user data with profile_id fallback
+        return {
+            user: userObj,
+            token,
+            user_id: user._id.toString(),
+            profile_id: user.profile_id || user._id.toString(),
+            organization: user.organization,
+            firstName: user.profile.firstName,
+            lastName: user.profile.lastName,
+            email: user.profile.email,
+            role: role,
+            permissions: user.permissions || []
         };
     }
 }

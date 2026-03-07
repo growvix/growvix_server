@@ -13,10 +13,18 @@ export const registerSchema = z.object({
         }),
         password: z.string().min(6, "Password must be at least 6 characters"),
         role: z.enum(['user', 'admin']).optional(),
+        department: z.enum(['pre-sales', 'sales', 'post-sales']).optional(),
+        permissions: z.array(z.string()).optional(),
     }),
 });
 
 export const loginSchema = z.object({
+    body: z.object({
+        email: z.string().email("Invalid email address"),
+        password: z.string().min(1, "Password is required"),
+    }),
+});
+export const cploginSchema = z.object({
     body: z.object({
         email: z.string().email("Invalid email address"),
         password: z.string().min(1, "Password is required"),

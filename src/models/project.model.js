@@ -18,6 +18,15 @@ const UnitSchema = new Schema({
     position: {
         row: { type: Number },
         col: { type: Number }
+    },
+    bookedBy: {
+        leadName: { type: String },
+        leadUuid: { type: String },
+        profileId: { type: Number },  // Lead's profile_id
+        phone: { type: String },
+        userId: { type: String },    // Added: Who booked it
+        userName: { type: String },  // Added: Name of user who booked it
+        bookedAt: { type: Date }     // Added: Timestamp of booking
     }
 }, { _id: false });
 
@@ -50,7 +59,16 @@ const PlotSchema = new Schema({
         enum: ['available', 'booked', 'sold'],
         default: 'available'
     },
-    price: { type: Number }
+    price: { type: Number },
+    bookedBy: {
+        leadName: { type: String },
+        leadUuid: { type: String },
+        profileId: { type: Number },  // Lead's profile_id
+        phone: { type: String },
+        userId: { type: String },    // Added: Who booked it
+        userName: { type: String },  // Added: Name of user who booked it
+        bookedAt: { type: Date }     // Added: Timestamp of booking
+    }
 }, { _id: false });
 
 // Main Project Schema

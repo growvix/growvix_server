@@ -154,6 +154,8 @@ export class UserService {
                 const clientUpdate = {};
                 if (data.profile) clientUpdate.profile = data.profile;
                 if (data.role) clientUpdate.role = data.role;
+                if (data.department) clientUpdate.department = data.department;
+                if (data.permissions) clientUpdate.permissions = data.permissions;
 
                 await ClientUser.findOneAndUpdate(
                     { globalUserId: id },

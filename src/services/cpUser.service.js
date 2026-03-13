@@ -4,6 +4,8 @@ import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import { hashPassword } from '../utils/security.util.js';
 
+import mongoose from 'mongoose';
+
 export class CpUserService {
 
     /**
@@ -138,13 +140,32 @@ export class CpUserService {
      * this handles both old ObjectId records and new UUID records safely.
      */
     async deleteCpUser(id, organization) {
+        // Build a query that covers standard combinations (Plain String, Mongoose ObjectId, Mongoose UUID)
+        const idConditions = [{ _id: id }];
+        
+        try {
+            if (mongoose.isValidObjectId(id)) {
+                idConditions.push({ _id: new mongoose.Types.ObjectId(id) });
+            }
+        } catch(e) {}
+        
+        try {
+            if (mongoose.mongo && mongoose.mongo.BSON && mongoose.mongo.BSON.UUID) {
+                idConditions.push({ _id: new mongoose.mongo.BSON.UUID(id) });
+            } else if (mongoose.mongo && mongoose.mongo.UUID) {
+                idConditions.push({ _id: new mongoose.mongo.UUID(id) });
+            }
+        } catch(e) {}
+
+        const filter = { $or: idConditions };
+
         // Delete from global DB using native driver (bypasses UUID cast)
-        const globalResult = await GlobalCpUser.collection.deleteOne({ _id: id });
+        const globalResult = await GlobalCpUser.collection.deleteOne(filter);
 
         // Also try deleting from org DB using native driver
         try {
             const OrgCpUser = await this._getOrgModel(organization);
-            await OrgCpUser.collection.deleteOne({ _id: id });
+            await OrgCpUser.collection.deleteOne(filter);
         } catch (orgError) {
             console.error('Org DB cp_user delete failed:', orgError.message);
         }

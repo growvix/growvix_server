@@ -121,11 +121,41 @@ export class LeadActivityService {
 
             // Batch-resolve user names (including completed_by users)
             const ClientUser = getClientUserModel(orgConn);
-            const allUserIds = new Set(activities.map(a => Number(a.user_id)));
-            activities.forEach(a => { if (a.site_visit_completed_by) allUserIds.add(Number(a.site_visit_completed_by)); });
-            const uniqueUserIds = [...allUserIds];
-            const users = await ClientUser.find({ profile_id: { $in: uniqueUserIds } }).lean();
-            const userMap = new Map(users.map(u => [u.profile_id, `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim()]));
+            const allProfileIds = new Set();
+            const allUuids = new Set();
+            activities.forEach(a => {
+                const uid = Number(a.user_id);
+                if (!isNaN(uid)) allProfileIds.add(uid);
+                else if (a.user_id) allUuids.add(a.user_id);
+                
+                if (a.site_visit_completed_by) {
+                    const cid = Number(a.site_visit_completed_by);
+                    if (!isNaN(cid)) allProfileIds.add(cid);
+                    else allUuids.add(a.site_visit_completed_by);
+                }
+            });
+            const uniqueProfileIds = [...allProfileIds];
+            const uniqueUuids = [...allUuids];
+            
+            const userQuery = [];
+            if (uniqueProfileIds.length > 0) userQuery.push({ profile_id: { $in: uniqueProfileIds } });
+            if (uniqueUuids.length > 0) {
+                userQuery.push({ _id: { $in: uniqueUuids } });
+                userQuery.push({ globalUserId: { $in: uniqueUuids } });
+            }
+            
+            let users = [];
+            if (userQuery.length > 0) {
+                users = await ClientUser.find({ $or: userQuery }).lean();
+            }
+
+            const userMap = new Map();
+            users.forEach(u => {
+                const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
+                if (u.profile_id) userMap.set(String(u.profile_id), name);
+                if (u._id) userMap.set(String(u._id), name);
+                if (u.globalUserId) userMap.set(String(u.globalUserId), name);
+            });
 
             return activities.map(activity => ({
                 id: activity.id,
@@ -133,7 +163,7 @@ export class LeadActivityService {
                 updates: activity.updates,
                 lead_id: activity.lead_id,
                 user_id: activity.user_id,
-                user_name: userMap.get(Number(activity.user_id)) || 'Unknown',
+                user_name: userMap.get(String(activity.user_id)) || 'Unknown',
                 stage: activity.stage,
                 status: activity.status,
                 notes: activity.notes,
@@ -142,7 +172,7 @@ export class LeadActivityService {
                 site_visit_completed: activity.site_visit_completed || false,
                 site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
                 site_visit_completed_by: activity.site_visit_completed_by || null,
-                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(Number(activity.site_visit_completed_by)) || 'Unknown') : null,
+                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by)) || 'Unknown') : null,
                 site_visit_project_id: activity.site_visit_project_id || null,
                 site_visit_project_name: activity.site_visit_project_name || null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
@@ -174,17 +204,49 @@ export class LeadActivityService {
 
             // Batch-resolve user names (including completed_by users)
             const ClientUser = getClientUserModel(orgConn);
-            const allUserIds = new Set(activities.map(a => Number(a.user_id)));
-            activities.forEach(a => { if (a.site_visit_completed_by) allUserIds.add(Number(a.site_visit_completed_by)); });
-            const uniqueUserIds = [...allUserIds];
-            const users = await ClientUser.find({ profile_id: { $in: uniqueUserIds } }).lean();
-            const userMap = new Map(users.map(u => [u.profile_id, `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim()]));
+            const allProfileIds = new Set();
+            const allUuids = new Set();
+            activities.forEach(a => {
+                const uid = Number(a.user_id);
+                if (!isNaN(uid)) allProfileIds.add(uid);
+                else if (a.user_id) allUuids.add(a.user_id);
+                
+                if (a.site_visit_completed_by) {
+                    const cid = Number(a.site_visit_completed_by);
+                    if (!isNaN(cid)) allProfileIds.add(cid);
+                    else allUuids.add(a.site_visit_completed_by);
+                }
+            });
+            const uniqueProfileIds = [...allProfileIds];
+            const uniqueUuids = [...allUuids];
+            
+            const userQuery = [];
+            if (uniqueProfileIds.length > 0) userQuery.push({ profile_id: { $in: uniqueProfileIds } });
+            if (uniqueUuids.length > 0) {
+                userQuery.push({ _id: { $in: uniqueUuids } });
+                userQuery.push({ globalUserId: { $in: uniqueUuids } });
+            }
+            
+            let users = [];
+            if (userQuery.length > 0) {
+                users = await ClientUser.find({ $or: userQuery }).lean();
+            }
+
+            const userMap = new Map();
+            users.forEach(u => {
+                const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
+                if (u.profile_id) userMap.set(String(u.profile_id), name);
+                if (u._id) userMap.set(String(u._id), name);
+                if (u.globalUserId) userMap.set(String(u.globalUserId), name);
+            });
 
             return activities.map(activity => ({
                 id: activity.id,
+                profile_id: activity.profile_id,
+                lead_id: activity.lead_id,
                 updates: activity.updates,
                 user_id: activity.user_id,
-                user_name: userMap.get(Number(activity.user_id)) || 'Unknown',
+                user_name: userMap.get(String(activity.user_id)) || 'Unknown',
                 stage: activity.stage,
                 reason: activity.reason,
                 status: activity.status,
@@ -194,7 +256,7 @@ export class LeadActivityService {
                 site_visit_completed: activity.site_visit_completed || false,
                 site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
                 site_visit_completed_by: activity.site_visit_completed_by || null,
-                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(Number(activity.site_visit_completed_by)) || 'Unknown') : null,
+                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by)) || 'Unknown') : null,
                 site_visit_project_id: activity.site_visit_project_id || null,
                 site_visit_project_name: activity.site_visit_project_name || null,
                 createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
@@ -324,32 +386,65 @@ export class LeadActivityService {
             if (activities.length === 0) return [];
 
             // Batch-resolve user names
-            const allUserIds = new Set(activities.map(a => Number(a.user_id)));
-            activities.forEach(a => { if (a.site_visit_completed_by) allUserIds.add(Number(a.site_visit_completed_by)); });
-            const users = await ClientUser.find({ profile_id: { $in: [...allUserIds] } }).lean();
-            const userMap = new Map(users.map(u => [u.profile_id, `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim()]));
+            const allProfileIds = new Set();
+            const allUuids = new Set();
+            activities.forEach(a => {
+                const uid = Number(a.user_id);
+                if (!isNaN(uid)) allProfileIds.add(uid);
+                else if (a.user_id) allUuids.add(a.user_id);
+                if (a.site_visit_completed_by) {
+                    const cid = Number(a.site_visit_completed_by);
+                    if (!isNaN(cid)) allProfileIds.add(cid);
+                    else allUuids.add(a.site_visit_completed_by);
+                }
+            });
+            const uniqueProfileIds = [...allProfileIds];
+            const uniqueUuids = [...allUuids];
+            
+            const userQuery = [];
+            if (uniqueProfileIds.length > 0) userQuery.push({ profile_id: { $in: uniqueProfileIds } });
+            if (uniqueUuids.length > 0) {
+                userQuery.push({ _id: { $in: uniqueUuids } });
+                userQuery.push({ globalUserId: { $in: uniqueUuids } });
+            }
+            
+            let users = [];
+            if (userQuery.length > 0) {
+                users = await ClientUser.find({ $or: userQuery }).lean();
+            }
 
-            // Batch-resolve lead names
-            const leadIds = [...new Set(activities.map(a => a.lead_id))];
-            const leads = await Lead.find({ _id: { $in: leadIds } }).select('_id profile.name').lean();
-            const leadMap = new Map(leads.map(l => [l._id.toString(), l.profile?.name || 'Unknown']));
+            const userMap = new Map();
+            users.forEach(u => {
+                const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
+                if (u.profile_id) userMap.set(String(u.profile_id), name);
+                if (u._id) userMap.set(String(u._id), name);
+                if (u.globalUserId) userMap.set(String(u.globalUserId), name);
+            });
 
-            return activities.map(a => ({
-                id: a.id,
-                lead_id: a.lead_id,
-                lead_name: leadMap.get(a.lead_id) || 'Unknown',
-                profile_id: a.profile_id,
-                user_id: a.user_id,
-                user_name: userMap.get(Number(a.user_id)) || 'Unknown',
-                site_visit_date: a.site_visit_date ? new Date(a.site_visit_date).toISOString() : null,
-                site_visit_completed: a.site_visit_completed || false,
-                site_visit_completed_at: a.site_visit_completed_at ? new Date(a.site_visit_completed_at).toISOString() : null,
-                site_visit_completed_by: a.site_visit_completed_by || null,
-                site_visit_completed_by_name: a.site_visit_completed_by ? (userMap.get(Number(a.site_visit_completed_by)) || 'Unknown') : null,
-                site_visit_project_id: a.site_visit_project_id || null,
-                site_visit_project_name: a.site_visit_project_name || null,
-                createdAt: a.createdAt ? new Date(a.createdAt).toISOString() : '',
-            }));
+            // Need lead details to get lead name
+            const leadIds = [...new Set(activities.map(a => String(a.lead_id)))];
+            const leads = await Lead.find({ _id: { $in: leadIds } }).select('profile_id profile').lean();
+            const leadMap = new Map(leads.map(l => [String(l._id), l]));
+
+            return activities.map(activity => {
+                const lead = leadMap.get(String(activity.lead_id));
+                return {
+                    id: activity.id,
+                    profile_id: activity.profile_id,
+                    lead_id: activity.lead_id,
+                    lead_name: lead?.profile?.name || 'Unknown',
+                    user_id: activity.user_id,
+                    user_name: userMap.get(String(activity.user_id)) || 'Unknown',
+                    site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                    site_visit_completed: activity.site_visit_completed || false,
+                    site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
+                    site_visit_completed_by: activity.site_visit_completed_by || null,
+                    site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by)) || 'Unknown') : null,
+                    site_visit_project_id: activity.site_visit_project_id || null,
+                    site_visit_project_name: activity.site_visit_project_name || null,
+                    createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : ''
+                };
+            });
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to fetch site visit calendar data: ' + err.message, 500);

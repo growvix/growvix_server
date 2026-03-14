@@ -9,7 +9,8 @@ import { getClientUserModel } from '../models/clientUser.model.js';
 export const resolvers = {
     Query: {
         getAllLeads: async (_, { organization }) => {
-            const leads = await leadService.getAllLeads(organization);
+            const result = await leadService.getAllLeads(organization);
+            const leads = result.leads || [];
             // Resolve exe_user_name for each lead
             if (leads.length > 0) {
                 try {

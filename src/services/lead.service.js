@@ -91,7 +91,7 @@ export class LeadService {
             // Run count and paginated query in parallel
             const [total, leads] = await Promise.all([
                 Lead.countDocuments(query),
-                Lead.find(query).skip(safeOffset).limit(safeLimit).lean(),
+                Lead.find(query).sort({ profile_id: -1 }).skip(safeOffset).limit(safeLimit).lean(),
             ]);
 
             const mappedLeads = leads.map(lead => {
@@ -239,37 +239,9 @@ export class LeadService {
                 throw new AppError('Lead not found', 404);
             }
 
-            // Transform dates to strings for GraphQL
-            const transformAcquired = (acquired) => {
-                if (!acquired || !Array.isArray(acquired)) return [];
-                return acquired.map(item => ({
-                    ...item,
-                    _id: item._id?.toString() || '',
-                    received: item.received ? new Date(item.received).toISOString() : '',
-                    created_at: item.created_at ? new Date(item.created_at).toISOString() : '',
-                }));
-            };
-
-            return {
-                _id: lead._id.toString(),
-                profile_id: lead.profile_id,
-                organization: lead.organization,
-                profile: lead.profile || null,
-                stage: lead.stage,
-                status: lead.status,
-                prefered: lead.prefered || null,
-                pretype: lead.pretype || null,
-                bathroom: lead.bathroom || 0,
-                parking: lead.parking || 0,
-                project: lead.project || [],
-                floor: lead.floor || '',
-                facing: lead.facing || '',
-                merge_id: lead.merge_id || [],
-                acquired: transformAcquired(lead.acquired),
-                exe_user: lead.exe_user ? lead.exe_user.toString() : '',
-                createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',
-                updatedAt: lead.updatedAt ? new Date(lead.updatedAt).toISOString() : '',
-            };
+            // Return the full LeadDetail object via getLeadById
+            // This ensures all fields match the LeadDetail GraphQL type
+            return await this.getLeadById(organization, id);
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to update lead: ' + err.message, 500);

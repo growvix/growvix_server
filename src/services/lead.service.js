@@ -368,11 +368,11 @@ export class LeadService {
         }
     }
 
-    async toggleImportantActivity(organization, leadId, activityId, profileId) {
+    async toggleImportantActivity(organization, leadId, activityId, userId) {
         if (!organization) throw new AppError('Organization is required', 400);
         if (!leadId) throw new AppError('Lead ID is required', 400);
         if (!activityId) throw new AppError('Activity ID is required', 400);
-        if (!profileId) throw new AppError('Profile ID is required', 400);
+        if (!userId) throw new AppError('User ID is required', 400);
 
         try {
             const orgConn = await getOrganizationConnection(organization);
@@ -394,7 +394,7 @@ export class LeadService {
                 // Add it
                 lead.important_activities.push({
                     activity_id: activityId,
-                    marked_by: profileId,
+                    marked_by: userId,
                     marked_at: new Date()
                 });
             }

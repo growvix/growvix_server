@@ -17,7 +17,7 @@ export const typeDefs = `#graphql
     type ImportantActivity {
         activity_id: String!
         marked_at: String
-        marked_by: Int
+        marked_by: String
     }
 
     type LeadProfile {
@@ -235,6 +235,6 @@ export const typeDefs = `#graphql
         updatePropertyRequirement(organization: String!, leadId: String!, input: UpdatePropertyRequirementInput!): LeadDetail
         addInterestedProject(organization: String!, leadId: String!, projectId: Int!, projectName: String!): LeadDetail
         removeInterestedProject(organization: String!, leadId: String!, projectId: Int!): LeadDetail
-        toggleImportantActivity(organization: String!, leadId: String!, activityId: String!, profileId: Int!): LeadDetail
+        toggleImportantActivity(organization: String!, leadId: String!, activityId: String!, userId: String!): LeadDetail
     }
 `;

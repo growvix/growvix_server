@@ -11,6 +11,13 @@ export const typeDefs = `#graphql
         received: String
         exe_user: String
         exe_user_name: String
+        important_activities: [ImportantActivity]
+    }
+
+    type ImportantActivity {
+        activity_id: String!
+        marked_at: String
+        marked_by: String
     }
 
     type LeadProfile {
@@ -103,6 +110,7 @@ export const typeDefs = `#graphql
         site_visits_completed: Int
         activities: [LeadActivity!]!
         requirements: [LeadRequirement!]!
+        important_activities: [ImportantActivity]
     }
 
     type LeadActivity {
@@ -227,5 +235,6 @@ export const typeDefs = `#graphql
         updatePropertyRequirement(organization: String!, leadId: String!, input: UpdatePropertyRequirementInput!): LeadDetail
         addInterestedProject(organization: String!, leadId: String!, projectId: Int!, projectName: String!): LeadDetail
         removeInterestedProject(organization: String!, leadId: String!, projectId: Int!): LeadDetail
+        toggleImportantActivity(organization: String!, leadId: String!, activityId: String!, userId: String!): LeadDetail
     }
 `;

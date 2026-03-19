@@ -203,6 +203,11 @@ export class LeadService {
                 exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',
                 updatedAt: lead.updatedAt ? new Date(lead.updatedAt).toISOString() : '',
+                important_activities: (lead.important_activities || []).map(ia => ({
+                    activity_id: ia.activity_id,
+                    marked_at: ia.marked_at ? new Date(ia.marked_at).toISOString() : '',
+                    marked_by: ia.marked_by
+                })),
             };
         } catch (err) {
             throw new AppError('Failed to fetch lead: ' + err.message, 500);
@@ -360,6 +365,45 @@ export class LeadService {
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to remove interested project: ' + err.message, 500);
+        }
+    }
+
+    async toggleImportantActivity(organization, leadId, activityId, userId) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!leadId) throw new AppError('Lead ID is required', 400);
+        if (!activityId) throw new AppError('Activity ID is required', 400);
+        if (!userId) throw new AppError('User ID is required', 400);
+
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            const lead = await Lead.findById(leadId);
+            if (!lead) throw new AppError('Lead not found', 404);
+
+            if (!lead.important_activities) {
+                lead.important_activities = [];
+            }
+
+            const existingIndex = lead.important_activities.findIndex(ia => ia.activity_id === activityId);
+
+            if (existingIndex > -1) {
+                // Remove it
+                lead.important_activities.splice(existingIndex, 1);
+            } else {
+                // Add it
+                lead.important_activities.push({
+                    activity_id: activityId,
+                    marked_by: userId,
+                    marked_at: new Date()
+                });
+            }
+
+            await lead.save();
+            return this.getLeadById(organization, leadId);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to toggle important activity: ' + err.message, 500);
         }
     }
 }

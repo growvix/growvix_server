@@ -44,6 +44,11 @@ export class AuthController {
 
         res.status(200).json(ApiResponse.success('Login successful', responseData));
     });
+    impersonate = asyncHandler(async (req, res) => {
+        const { targetUserId } = req.body;
+        const result = await authService.impersonate(req.user._id, targetUserId);
+        res.status(200).json(ApiResponse.success('Impersonation successful', result));
+    });
 }
 
 export const authController = new AuthController();

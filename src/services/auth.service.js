@@ -140,6 +140,34 @@ export class AuthService {
             permissions: user.permissions || []
         };
     }
+
+    async impersonate(adminUserId, targetUserId) {
+        // Verify the caller is an admin
+        const adminUser = await User.findById(adminUserId);
+        if (!adminUser || adminUser.role !== 'admin') {
+            throw new AppError('Only admins can impersonate other users', 403);
+        }
+
+        // Find the target user
+        const targetUser = await User.findById(targetUserId);
+        if (!targetUser) {
+            throw new AppError('Target user not found', 404);
+        }
+
+        const token = signToken(targetUser._id, targetUser.role);
+
+        return {
+            user_id: targetUser._id.toString(),
+            profile_id: targetUser.profile_id,
+            organization: targetUser.organization,
+            firstName: targetUser.profile.firstName,
+            lastName: targetUser.profile.lastName,
+            email: targetUser.profile.email,
+            token,
+            role: targetUser.role,
+            permissions: targetUser.permissions || []
+        };
+    }
 }
 
 export const authService = new AuthService();

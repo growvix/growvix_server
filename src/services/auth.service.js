@@ -137,7 +137,8 @@ export class AuthService {
             lastName: user.profile.lastName,
             email: user.profile.email,
             role: role,
-            permissions: user.permissions || []
+            permissions: user.permissions || [],
+            allowed_projects: user.allowed_projects || [],
         };
     }
 }

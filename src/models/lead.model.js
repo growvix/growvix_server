@@ -52,7 +52,7 @@ const LeadSchema = new Schema(
         important_activities: [{
             activity_id: { type: String, required: true },
             marked_at: { type: Date, default: Date.now },
-            marked_by: { type: Number }
+            marked_by: { type: Schema.Types.Mixed }
         }]
     },
     {

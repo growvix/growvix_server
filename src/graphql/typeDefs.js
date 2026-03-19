@@ -17,7 +17,7 @@ export const typeDefs = `#graphql
     type ImportantActivity {
         activity_id: String!
         marked_at: String
-        marked_by: Int
+        marked_by: String
     }
 
     type LeadProfile {

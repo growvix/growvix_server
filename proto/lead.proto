@@ -10,6 +10,12 @@ message Lead {
   string source = 4;
   string sub_source = 5;
   string received = 6;
+  string phone = 7;
+  string lead_id = 8;
+  string stage = 9;
+  string status = 10;
+  string exe_user = 11;
+  string exe_user_name = 12;
 }
 
 // Request message for GetAllLeads

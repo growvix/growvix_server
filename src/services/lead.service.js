@@ -207,7 +207,7 @@ export class LeadService {
                 important_activities: (lead.important_activities || []).map(ia => ({
                     activity_id: ia.activity_id,
                     marked_at: ia.marked_at ? new Date(ia.marked_at).toISOString() : '',
-                    marked_by: ia.marked_by
+                    marked_by: ia.marked_by?.toString()
                 })),
             };
         } catch (err) {

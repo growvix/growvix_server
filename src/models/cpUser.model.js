@@ -28,6 +28,10 @@ const cpUserSchemaDefinition = {
     company: { type: String, trim: true, default: '' },
     team: { type: String, trim: true, default: '' },
     isActive: { type: Boolean, default: true },
+    allowed_projects: [{
+        project_id: { type: Number, required: true },
+        project_name: { type: String, required: true },
+    }],
 };
 
 const schemaOptions = {

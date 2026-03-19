@@ -7,6 +7,7 @@ export const LeadSchema = {
     _id: '',
     profileId: '',
     name: '',
+    phone: '',
     stage: '',
     status: '',
     campaign: '',

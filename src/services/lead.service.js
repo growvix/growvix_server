@@ -106,6 +106,7 @@ export class LeadService {
                     lead_id: lead._id.toString(),
                     profile_id: lead.profile_id,
                     name: lead.profile?.name || '',
+                    phone: lead.profile?.phone || '',
                     stage: lead.stage || '',
                     status: lead.status || '',
                     campaign: lead.acquired?.[0]?.campaign || '',

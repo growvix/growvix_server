@@ -108,6 +108,8 @@ export class ProjectService {
         try {
             const orgConn = await getOrganizationConnection(organization);
             const Project = getProjectModel(orgConn);
+            
+            console.log(`[ProjectService] getAllProjects called for organization: "${organization}" (dbName: ${orgConn.name})`);
 
             // Use aggregation for faster performance with large datasets
             const projects = await Project.aggregate([
@@ -196,9 +198,12 @@ export class ProjectService {
                 },
                 { $sort: { createdAt: -1 } }
             ]);
+            
+            console.log(`[ProjectService] Found ${projects.length} projects for organization "${organization}".`);
 
             return projects;
         } catch (err) {
+            console.error(`[ProjectService] Error in getAllProjects:`, err);
             throw new AppError('Failed to fetch projects: ' + err.message, 500);
         }
     }

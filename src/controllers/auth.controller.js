@@ -39,7 +39,8 @@ export class AuthController {
             email: result.email,
             token: result.token,
             role: result.role,
-            permissions: result.permissions || []
+            permissions: result.permissions || [],
+            allowed_projects: result.allowed_projects || []
         };
 
         res.status(200).json(ApiResponse.success('Login successful', responseData));

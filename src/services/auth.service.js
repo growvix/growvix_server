@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { User } from '../models/user.model.js';
 import { GlobalCpUser } from '../models/cpUser.model.js';
+import { GlobalCpTeam } from '../models/cpTeam.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import { hashPassword, comparePassword, signToken } from '../utils/security.util.js';
 const { getOrganizationConnection } = await import('../config/multiTenantDb.js');
@@ -126,6 +127,39 @@ export class AuthService {
         const userObj = user.toObject();
         delete userObj.password;
 
+        const permissions = user.permissions || [];
+        let allowed_projects = user.allowed_projects || [];
+
+        // Combine user's specific projects with their team's projects
+        if (user.team && user.organization) {
+            try {
+                const team = await GlobalCpTeam.findOne({
+                    name: user.team,
+                    organization: user.organization,
+                    isActive: true
+                }).lean();
+
+                if (team && team.allowed_projects && team.allowed_projects.length > 0) {
+                    // Create a Map with project_id as key to avoid duplicates
+                    const projectMap = new Map();
+                    
+                    // Add user's existing projects
+                    allowed_projects.forEach(p => projectMap.set(p.project_id, p));
+                    
+                    // Merge team projects
+                    team.allowed_projects.forEach(p => {
+                        if (!projectMap.has(p.project_id)) {
+                            projectMap.set(p.project_id, p);
+                        }
+                    });
+                    
+                    allowed_projects = Array.from(projectMap.values());
+                }
+            } catch (err) {
+                console.error(`Error fetching team projects for user ${user._id}:`, err.message);
+            }
+        }
+
         // Return user data with profile_id fallback
         return {
             user: userObj,
@@ -137,7 +171,36 @@ export class AuthService {
             lastName: user.profile.lastName,
             email: user.profile.email,
             role: role,
-            permissions: user.permissions || []
+            permissions: permissions,
+            allowed_projects: allowed_projects,
+        };
+    }
+
+    async impersonate(adminUserId, targetUserId) {
+        // Verify the caller is an admin
+        const adminUser = await User.findById(adminUserId);
+        if (!adminUser || adminUser.role !== 'admin') {
+            throw new AppError('Only admins can impersonate other users', 403);
+        }
+
+        // Find the target user
+        const targetUser = await User.findById(targetUserId);
+        if (!targetUser) {
+            throw new AppError('Target user not found', 404);
+        }
+
+        const token = signToken(targetUser._id, targetUser.role);
+
+        return {
+            user_id: targetUser._id.toString(),
+            profile_id: targetUser.profile_id,
+            organization: targetUser.organization,
+            firstName: targetUser.profile.firstName,
+            lastName: targetUser.profile.lastName,
+            email: targetUser.profile.email,
+            token,
+            role: targetUser.role,
+            permissions: targetUser.permissions || []
         };
     }
 }

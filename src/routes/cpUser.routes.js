@@ -130,4 +130,42 @@ router.put('/:id', cpUserController.update);
  */
 router.delete('/:id', cpUserController.delete);
 
+/**
+ * @swagger
+ * /api/cp-users/{id}/projects:
+ *   patch:
+ *     summary: Update allowed inventory projects for a Channel Partner
+ *     tags: [Channel Partners]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               organization:
+ *                 type: string
+ *               projects:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     project_id:
+ *                       type: number
+ *                     project_name:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: Allowed projects updated
+ */
+router.patch('/:id/projects', cpUserController.updateProjects);
+
 export default router;

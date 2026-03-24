@@ -39,6 +39,7 @@ export async function getAllLeads(req) {
             lead_id: lead.lead_id,
             profile_id: lead.profile_id,
             name: lead.name || '',
+            phone: lead.phone || '',
             stage: lead.stage || '',
             status: lead.status || '',
             campaign: lead.campaign || '',

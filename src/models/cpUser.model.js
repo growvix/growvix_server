@@ -19,7 +19,7 @@ const cpUserSchemaDefinition = {
     organization: { type: String, required: true, index: true },
     profile: {
         firstName: { type: String, required: true, trim: true },
-        lastName: { type: String, required: true, trim: true },
+        lastName: { type: String, trim: true },
         email: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
         phone: { type: String, trim: true },
         address: { type: String, trim: true },
@@ -28,6 +28,10 @@ const cpUserSchemaDefinition = {
     company: { type: String, trim: true, default: '' },
     team: { type: String, trim: true, default: '' },
     isActive: { type: Boolean, default: true },
+    allowed_projects: [{
+        project_id: { type: Number, required: true },
+        project_name: { type: String, required: true },
+    }],
 };
 
 const schemaOptions = {

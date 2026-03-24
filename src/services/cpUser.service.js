@@ -142,20 +142,20 @@ export class CpUserService {
     async deleteCpUser(id, organization) {
         // Build a query that covers standard combinations (Plain String, Mongoose ObjectId, Mongoose UUID)
         const idConditions = [{ _id: id }];
-        
+
         try {
             if (mongoose.isValidObjectId(id)) {
                 idConditions.push({ _id: new mongoose.Types.ObjectId(id) });
             }
-        } catch(e) {}
-        
+        } catch (e) { }
+
         try {
             if (mongoose.mongo && mongoose.mongo.BSON && mongoose.mongo.BSON.UUID) {
                 idConditions.push({ _id: new mongoose.mongo.BSON.UUID(id) });
             } else if (mongoose.mongo && mongoose.mongo.UUID) {
                 idConditions.push({ _id: new mongoose.mongo.UUID(id) });
             }
-        } catch(e) {}
+        } catch (e) { }
 
         const filter = { $or: idConditions };
 
@@ -177,6 +177,42 @@ export class CpUserService {
         }
 
         return { _id: id };
+    }
+
+    /**
+     * Update the allowed inventory projects for a Channel Partner
+     * @param {string} id - CP User ID
+     * @param {string} organization
+     * @param {Array<{project_id: number, project_name: string}>} projects
+     */
+    async updateAllowedProjects(id, organization, projects = []) {
+        if (!organization) throw new AppError('Organization is required', 400);
+
+        const updateData = { allowed_projects: projects };
+
+        // Update global DB
+        const updated = await GlobalCpUser.findByIdAndUpdate(
+            id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        );
+        if (!updated) throw new AppError('Channel Partner not found', 404);
+
+        // Sync to org DB
+        try {
+            const OrgCpUser = await this._getOrgModel(organization);
+            await OrgCpUser.findOneAndUpdate(
+                { $or: [{ _id: id }, { globalCpUserId: id }] },
+                { $set: updateData },
+                { new: true }
+            );
+        } catch (orgError) {
+            console.error('Org DB cp_user allowed_projects update failed:', orgError.message);
+        }
+
+        const cpUserObj = updated.toObject();
+        delete cpUserObj.password;
+        return cpUserObj;
     }
 }
 

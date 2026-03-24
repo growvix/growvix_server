@@ -68,6 +68,14 @@ export class CpUserController {
         await cpUserService.deleteCpUser(req.params.id, org);
         res.status(200).json(ApiResponse.success('Channel Partner deleted successfully'));
     });
+
+    // PATCH /api/cp-users/:id/projects
+    updateProjects = asyncHandler(async (req, res) => {
+        const org = req.body.organization || req.user?.organization;
+        const { projects } = req.body;
+        const cpUser = await cpUserService.updateAllowedProjects(req.params.id, org, projects || []);
+        res.status(200).json(ApiResponse.success('Allowed projects updated successfully', cpUser));
+    });
 }
 
 export const cpUserController = new CpUserController();

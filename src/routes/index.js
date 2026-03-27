@@ -9,6 +9,7 @@ import cpUserRoutes from './cpUser.routes.js';
 import cpTeamRoutes from './cpTeam.routes.js';
 import ivrRoutes from './ivr.routes.js';
 import mailRoutes from './mail.routes.js';
+import googleWebhookRoutes from './googleWebhook.routes.js';
 
 
 const router = Router();
@@ -23,5 +24,6 @@ router.use('/cp-users', cpUserRoutes);
 router.use('/cp-teams', cpTeamRoutes);
 router.use('/ivr-call', ivrRoutes);
 router.use('/mail', mailRoutes);
+router.use('/webhooks', googleWebhookRoutes);
 
 export default router;

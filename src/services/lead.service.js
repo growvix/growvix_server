@@ -1,5 +1,6 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadModel } from '../models/lead.model.js';
+import { getBulkUploadModel } from '../models/bulkUpload.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,6 +8,7 @@ import { roundRobinService } from './roundRobin.service.js';
 
 export class LeadService {
     async addLead(data) {
+        // ... (existing addLead remains unchanged above) ...
         const organization = data.organization;
         if (!organization) {
             throw new AppError('Organization is required', 400);
@@ -42,6 +44,171 @@ export class LeadService {
             return lead;
         } catch (err) {
             throw new AppError('Failed to add lead: ' + err.message, 500);
+        }
+    }
+
+    async bulkAddLeads(leadsData, organization, userId, options = {}) {
+        if (!organization) {
+            throw new AppError('Organization is required', 400);
+        }
+        
+        const { hasHeader = true, mappings = null, fileName = '', initiatedByName = '', initiatedByEmail = '' } = options;
+        
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            // Find current highest profile_id
+            const lastLead = await Lead.findOne().sort({ profile_id: -1 }).select('profile_id');
+            let nextProfileId = lastLead ? lastLead.profile_id + 1 : 1;
+
+            const validLeads = [];
+            const errors = [];
+
+            // Skip first row if it's a header
+            const startIndex = hasHeader ? 1 : 0;
+
+            for (let i = startIndex; i < leadsData.length; i++) {
+                const row = leadsData[i];
+                if (!row || (Array.isArray(row) && row.length === 0)) continue;
+
+                let name = '';
+                let phone = '';
+                let email = '';
+                let location = '';
+                let campaign = '';
+                let source = '';
+                let subSource = '';
+                let medium = '';
+
+                if (mappings) {
+                    // Use custom mapping (indices)
+                    Object.entries(mappings).forEach(([idx, field]) => {
+                        const val = row[idx];
+                        if (val === undefined || val === null) return;
+                        
+                        switch(field) {
+                            case 'name': name = val; break;
+                            case 'phone': phone = val; break;
+                            case 'email': email = val; break;
+                            case 'location': location = val; break;
+                            case 'campaign': campaign = val; break;
+                            case 'source': source = val; break;
+                            case 'sub_source': subSource = val; break;
+                            case 'medium': medium = val; break;
+                        }
+                    });
+                } else if (!Array.isArray(row)) {
+                    // Legacy support: row is an object from sheet_to_json (non-header: 1 mode)
+                    name = row['Name'] || row['name'] || row['Lead Name'] || '';
+                    phone = row['Phone'] || row['phone'] || row['Phone Number'] || row['Mobile'] || '';
+                    email = row['Email'] || row['email'] || row['Email Address'] || '';
+                    location = row['Location'] || row['location'] || row['City'] || '';
+                    campaign = row['Campaign'] || row['campaign'] || '';
+                    source = row['Source'] || row['source'] || '';
+                    medium = row['Medium'] || row['medium'] || '';
+                    subSource = row['Sub Source'] || row['sub_source'] || '';
+                }
+
+                if (!name || !phone) {
+                    errors.push({ row: i + 1, error: 'Name and Phone are mandatory.' });
+                    continue;
+                }
+
+                // Prepare lead object following LeadSchema structure
+                const leadDoc = {
+                    _id: uuidv4(),
+                    profile_id: nextProfileId++,
+                    organization: organization,
+                    profile: {
+                        name: String(name).trim(),
+                        email: String(email).trim(),
+                        phone: String(phone).trim(),
+                        location: String(location).trim()
+                    },
+                    stage: 'new lead',
+                    status: 'Untouched',
+                    acquired: []
+                };
+
+                if (campaign || source || medium || subSource) {
+                    leadDoc.acquired.push({
+                        campaign: String(campaign).trim(),
+                        source: String(source).trim(),
+                        sub_source: String(subSource).trim(),
+                        medium: String(medium).trim(),
+                        received: new Date(),
+                        created_at: new Date()
+                    });
+                }
+
+                // Assign to user if provided
+                if (userId) {
+                    // Check if user is pre-sales or similar if needed, otherwise assign
+                    leadDoc.exe_user = userId;
+                }
+
+                // Optional: round-robin assignment override if userId was not provided or specific logic wanted
+                // For now, we prefer the provided userId (uploader) or fall back to RR if needed.
+                // Re-enabling Round Robin if no direct assignment logic is strictly required to be the uploader.
+                try {
+                    const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
+                    if (assignedUserId) {
+                        leadDoc.exe_user = assignedUserId;
+                    }
+                } catch (rrErr) {
+                    // Fallback to userId if RR fails
+                }
+
+                validLeads.push(leadDoc);
+            }
+
+            let insertedCount = 0;
+            if (validLeads.length > 0) {
+                const inserted = await Lead.insertMany(validLeads);
+                insertedCount = inserted.length;
+            }
+
+            // Determine first source/campaign from the data for the batch record
+            let batchSource = '';
+            let batchCampaign = '';
+            if (validLeads.length > 0 && validLeads[0].acquired && validLeads[0].acquired.length > 0) {
+                batchSource = validLeads[0].acquired[0].source || '';
+                batchCampaign = validLeads[0].acquired[0].campaign || '';
+            }
+
+            // Determine status
+            let status = 'Success';
+            if (insertedCount === 0 && errors.length > 0) status = 'Error';
+            else if (errors.length > 0 && insertedCount > 0) status = 'Partial';
+
+            // Save bulk upload record
+            const BulkUpload = getBulkUploadModel(orgConn);
+            await BulkUpload.create({
+                _id: uuidv4(),
+                organization,
+                fileName: fileName || 'Unknown',
+                totalLeads: leadsData.length - startIndex,
+                uploadedLeads: insertedCount,
+                existingLeads: 0,
+                errorLeads: errors.length,
+                source: batchSource,
+                campaign: batchCampaign,
+                initiatedBy: userId || '',
+                initiatedByName: initiatedByName || '',
+                initiatedByEmail: initiatedByEmail || '',
+                status,
+                allowReEngage: true,
+            });
+
+            return {
+                totalRows: leadsData.length - startIndex,
+                successCount: insertedCount,
+                errorCount: errors.length,
+                errors: errors
+            };
+        } catch (err) {
+            throw new AppError('Failed to bulk insert leads: ' + err.message, 500);
         }
     }
 
@@ -405,6 +572,37 @@ export class LeadService {
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to toggle important activity: ' + err.message, 500);
+        }
+    }
+
+    async getBulkUploads(organization) {
+        if (!organization) {
+            throw new AppError('Organization is required', 400);
+        }
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const BulkUpload = getBulkUploadModel(orgConn);
+            const uploads = await BulkUpload.find({ organization })
+                .sort({ createdAt: -1 })
+                .lean();
+
+            return uploads.map(u => ({
+                _id: u._id?.toString() || '',
+                uploadDate: u.createdAt ? new Date(u.createdAt).toISOString() : '',
+                fileName: u.fileName || '',
+                totalLeads: u.totalLeads || 0,
+                uploadedLeads: u.uploadedLeads || 0,
+                existingLeads: u.existingLeads || 0,
+                errorLeads: u.errorLeads || 0,
+                source: u.source || '',
+                campaign: u.campaign || '',
+                initiatedBy: u.initiatedByName || u.initiatedByEmail || u.initiatedBy || '',
+                assignedTo: u.assignedTo || '-',
+                status: u.status || 'Success',
+                allowReEngage: u.allowReEngage !== false ? 'Yes' : 'No',
+            }));
+        } catch (err) {
+            throw new AppError('Failed to fetch bulk uploads: ' + err.message, 500);
         }
     }
 }

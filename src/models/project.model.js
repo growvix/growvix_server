@@ -34,6 +34,7 @@ const UnitSchema = new Schema({
 const FloorSchema = new Schema({
     floorNumber: { type: Number, required: true },   // 1, 2, 3, etc.
     floorName: { type: String },                     // "1st Floor", "Ground Floor"
+    floorChartImages: [{ type: String }],            // Up to 5 image URLs per floor
     units: [UnitSchema]
 }, { _id: false });
 

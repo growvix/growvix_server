@@ -54,7 +54,7 @@ export const getOrganizationConnection = async (organizationName) => {
         throw new Error('Organization name is required');
     }
 
-    const dbName = organizationName;
+    const dbName = organizationName.toLowerCase().replace(/[^a-z0-9_]/g, '_');
 
     // Fast path: return cached connection if ready
     const cachedConnection = connectionCache.get(dbName);

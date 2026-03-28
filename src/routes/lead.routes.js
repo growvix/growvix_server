@@ -3,8 +3,15 @@ import { leadController } from '../controllers/lead.controller.js';
 import { validateLead } from '../middleware/validateLead.middleware.js';
 
 import { leadStageController } from '../controllers/leadStage.controller.js';
+import { protect } from '../middleware/auth.middleware.js';
+import multer from 'multer';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
+
+// Protect all lead routes
+router.use(protect);
 
 /**
  * @swagger
@@ -79,6 +86,32 @@ router.post('/', validateLead, leadController.addLead);
 
 /**
  * @swagger
+ * /api/leads/bulk-upload:
+ *   post:
+ *     summary: Bulk upload leads via Excel/CSV file
+ *     tags: [Leads]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *               organization:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Leads uploaded successfully
+ *       400:
+ *         description: Validation or file formatting error
+ */
+router.post('/bulk-upload', upload.single('file'), leadController.bulkUploadLeads);
+
+/**
+ * @swagger
  * /api/leads/stages/{organization}:
  *   get:
  *     summary: Get lead stages for an organization
@@ -142,6 +175,24 @@ router.get('/stages/:organization', leadStageController.getStages);
  *         description: Lead not found
  */
 router.get('/search/:organization/:profileId', leadController.getLeadByProfileId);
+
+/**
+ * @swagger
+ * /api/leads/bulk-uploads/{organization}:
+ *   get:
+ *     summary: Get all bulk upload records for an organization
+ *     tags: [Leads]
+ *     parameters:
+ *       - in: path
+ *         name: organization
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Bulk uploads fetched
+ */
+router.get('/bulk-uploads/:organization', leadController.getBulkUploads);
 
 export default router;
 

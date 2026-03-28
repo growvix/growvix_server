@@ -19,7 +19,7 @@ const cpUserSchemaDefinition = {
     organization: { type: String, required: true, index: true },
     profile: {
         firstName: { type: String, required: true, trim: true },
-        lastName: { type: String, required: true, trim: true },
+        lastName: { type: String, trim: true },
         email: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
         phone: { type: String, trim: true },
         address: { type: String, trim: true },

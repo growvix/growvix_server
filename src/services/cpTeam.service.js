@@ -1,4 +1,4 @@
-import { getClientCpTeamModel } from '../models/cpTeam.model.js';
+import { getClientCpTeamModel, GlobalCpTeam } from '../models/cpTeam.model.js';
 import { getCpUserModel } from '../models/cpUser.model.js';
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { AppError } from '../utils/apiResponse.util.js';
@@ -32,8 +32,19 @@ export class CpTeamService {
             throw new AppError('A CP team with this name already exists', 400);
         }
 
-        // Create the team
+        // Step 1: Create the team in global DB
+        const globalCpTeam = await GlobalCpTeam.create({
+            name,
+            description: description || '',
+            organization,
+            members: memberIds || [],
+            createdBy,
+            isActive: true,
+        });
+
+        // Step 2: Create the team in org-specific DB
         const cpTeam = await ClientCpTeam.create({
+            _id: globalCpTeam._id, // Use the same UUID
             name,
             description: description || '',
             organization,
@@ -113,6 +124,11 @@ export class CpTeamService {
         }
 
         const oldName = cpTeam.name;
+
+        // Update global DB
+        await GlobalCpTeam.findByIdAndUpdate(teamId, data, { new: true, runValidators: true });
+
+        // Update org DB
         const updatedTeam = await ClientCpTeam.findByIdAndUpdate(teamId, data, { new: true, runValidators: true }).lean();
 
         // If name changed, update all members' team string
@@ -137,7 +153,10 @@ export class CpTeamService {
             throw new AppError('CP Team not found', 404);
         }
 
-        // Soft delete
+        // Soft delete in global DB
+        await GlobalCpTeam.findByIdAndUpdate(teamId, { isActive: false });
+
+        // Soft delete in org DB
         await ClientCpTeam.findByIdAndUpdate(teamId, { isActive: false });
 
         // Remove team reference from all members by setting their team string to empty
@@ -199,6 +218,12 @@ export class CpTeamService {
                 { $pullAll: { members: addedUserIds } }
             );
 
+            // Update global DB
+            await GlobalCpTeam.findByIdAndUpdate(teamId, {
+                $addToSet: { members: { $each: addedUserIds } }
+            });
+
+            // Update org DB
             await ClientCpTeam.findByIdAndUpdate(teamId, {
                 $addToSet: { members: { $each: addedUserIds } }
             });
@@ -224,7 +249,12 @@ export class CpTeamService {
             throw new AppError('CP Team not found', 404);
         }
 
-        // Remove user from team members
+        // Remove user from team members in global DB
+        await GlobalCpTeam.findByIdAndUpdate(teamId, {
+            $pull: { members: userId }
+        });
+
+        // Remove user from team members in org DB
         await ClientCpTeam.findByIdAndUpdate(teamId, {
             $pull: { members: userId }
         });

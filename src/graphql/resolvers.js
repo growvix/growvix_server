@@ -104,8 +104,8 @@ export const resolvers = {
         removeInterestedProject: async (_, { organization, leadId, projectId }) => {
             return await leadService.removeInterestedProject(organization, leadId, projectId);
         },
-        toggleImportantActivity: async (_, { organization, leadId, activityId, profileId }) => {
-            return await leadService.toggleImportantActivity(organization, leadId, activityId, profileId);
+        toggleImportantActivity: async (_, { organization, leadId, activityId, userId }) => {
+            return await leadService.toggleImportantActivity(organization, leadId, activityId, userId);
         },
     },
     LeadDetail: {

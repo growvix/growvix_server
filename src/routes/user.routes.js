@@ -108,6 +108,7 @@ router.get('/:id', authorizePermission('view_users'), userController.getUser);
  *                 type: string
  *               role:
  *                 type: string
+ *                 enum: [user, admin, manager]
  *               department:
  *                 type: string
  *                 enum: [pre-sales, sales, post-sales]
@@ -165,7 +166,7 @@ router.delete('/:id', authorizePermission('delete_users'), userController.delete
  *                 format: password
  *               role:
  *                 type: string
- *                 enum: [user, admin]
+ *                 enum: [user, admin, manager]
  *               department:
  *                 type: string
  *                 enum: [pre-sales, sales, post-sales]

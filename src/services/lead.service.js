@@ -27,6 +27,11 @@ export class LeadService {
                 data.stage = "new lead";
             }
 
+            // Set default status to 'No Activity' if not provided
+            if (data.status === undefined || data.status === null) {
+                data.status = "No Activity";
+            }
+
             // Assign UUID v4 as _id
             data._id = uuidv4();
 
@@ -127,7 +132,7 @@ export class LeadService {
                         location: String(location).trim()
                     },
                     stage: 'new lead',
-                    status: 'Untouched',
+                    status: 'No Activity',
                     acquired: []
                 };
 
@@ -236,7 +241,11 @@ export class LeadService {
                 query['acquired.campaign'] = { $regex: filters.campaign, $options: 'i' };
             }
             if (filters.status && filters.status !== 'undefined') {
-                query['status'] = filters.status;
+                if (filters.status === 'No Activity') {
+                    query['status'] = { $in: ['No Activity', 'Untouched'] };
+                } else {
+                    query['status'] = filters.status;
+                }
             }
             if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
                 query['exe_user'] = filters.assignedTo;
@@ -275,7 +284,7 @@ export class LeadService {
                     name: lead.profile?.name || '',
                     phone: lead.profile?.phone || '',
                     stage: lead.stage || '',
-                    status: lead.status || '',
+                    status: lead.status === 'Untouched' ? 'No Activity' : (lead.status || ''),
                     campaign: lead.acquired?.[0]?.campaign || '',
                     source: lead.acquired?.[0]?.source || '',
                     sub_source: lead.acquired?.[0]?.sub_source || '',
@@ -339,7 +348,7 @@ export class LeadService {
                 organization: lead.organization,
                 profile: lead.profile || null,
                 stage: lead.stage,
-                status: lead.status,
+                status: lead.status === 'Untouched' ? 'No Activity' : lead.status,
                 prefered: lead.prefered || null,
                 pretype: lead.pretype || null,
                 propertyRequirement: lead.requirement ? {

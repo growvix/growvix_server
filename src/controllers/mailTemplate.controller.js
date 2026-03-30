@@ -18,7 +18,7 @@ export const mailTemplateController = {
             // Handle file uploads
             const attachments = req.files ? req.files.map(file => ({
                 filename: file.originalname,
-                url: `/uploads/mail-templates/${file.filename}`,
+                url: `/uploads/mail_templates/${file.filename}`,
                 type: file.mimetype
             })) : [];
 
@@ -103,18 +103,28 @@ export const mailTemplateController = {
 
             let updateData = { templateName, projectId: projectId || null, description, subject, editorType: 'design', body };
 
-            // Handle file uploads if present
+            // Handle existing attachments
+            let attachments = [];
+            if (req.body.existingAttachments) {
+                try {
+                    attachments = typeof req.body.existingAttachments === 'string' 
+                        ? JSON.parse(req.body.existingAttachments) 
+                        : req.body.existingAttachments;
+                } catch (e) {
+                    console.error("Error parsing existingAttachments:", e);
+                }
+            }
+
+            // Handle new file uploads
             if (req.files && req.files.length > 0) {
                 const newAttachments = req.files.map((file) => ({
                     filename: file.originalname,
-                    url: `/uploads/mail-templates/${file.filename}`,
+                    url: `/uploads/mail_templates/${file.filename}`,
                     type: file.mimetype
                 }));
-                updateData.attachments = [
-                    ...(req.body.attachments || []), // Assuming existing attachments might be sent
-                    ...newAttachments,
-                ];
+                attachments = [...attachments, ...newAttachments];
             }
+            updateData.attachments = attachments;
 
             const template = await mailTemplateService.update(organization, id, updateData);
             return res.status(200).json(

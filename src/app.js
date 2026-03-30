@@ -22,6 +22,8 @@ app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use('/uploads/mail-templates', express.static(path.join(__dirname, '../uploads/mail_templates')));
+app.use('/uploads/mail_templates', express.static(path.join(__dirname, '../uploads/mail_templates')));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Swagger API docs

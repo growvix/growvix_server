@@ -48,12 +48,18 @@ export const resolvers = {
         getAllProjects: async (_, { organization }) => {
             const projects = await projectService.getAllProjects(organization);
             return projects.map(p => ({
-                product_id: p.product_id,
-                name: p.name,
-                location: p.location || null,
-                property: p.property || null,
+                ...p,
+                organization, // Inject organization for field resolvers
                 img_location: p.img_location || null,
             }));
+        },
+        getProjectById: async (_, { organization, id }) => {
+            const project = await projectService.getProjectById(organization, id);
+            if (!project) return null;
+            return {
+                ...project.toObject(),
+                organization // Inject organization for field resolvers
+            };
         },
         getLeadStages: async (_, { organization }) => {
             const result = await leadStageService.getStages(organization);
@@ -78,6 +84,17 @@ export const resolvers = {
                 isActive: u.isActive ?? true,
             }));
         },
+    },
+    ProjectSummary: {
+        bookedUnits: async (parent) => {
+            if (!parent.organization || !parent.product_id) return null;
+            try {
+                return await projectService.getProjectBookedUnits(parent.organization, parent.product_id);
+            } catch (err) {
+                console.error(`Failed to fetch booked units for project ${parent.product_id}:`, err.message);
+                return [];
+            }
+        }
     },
     Mutation: {
         createLeadActivity: async (_, { organization, input }) => {

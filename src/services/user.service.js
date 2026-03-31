@@ -5,12 +5,23 @@ import { AppError } from '../utils/apiResponse.util.js';
 import { hashPassword } from '../utils/security.util.js';
 
 export class UserService {
-    async getUserById(id) {
-        const user = await User.findById(id);
+    async getUserById(id, requesterPermissions = []) {
+        const user = await User.findById(id).lean();
         if (!user) {
             throw new AppError('User not found', 404);
         }
+
+        const canShowPhone = requesterPermissions.includes('show_user_phone_number');
+        if (!canShowPhone && user.profile?.phone && user.profile.phone !== "-") {
+            user.profile.phone = this._maskPhoneNumber(user.profile.phone);
+        }
+
         return user;
+    }
+
+    _maskPhoneNumber(phone) {
+        if (!phone || phone === "-" || phone.length <= 2) return phone;
+        return `********${phone.slice(-2)}`;
     }
 
     /**
@@ -100,6 +111,15 @@ export class UserService {
             User.countDocuments(query)
         ]);
 
+        const canShowPhone = (arguments[0].requesterPermissions || []).includes('show_user_phone_number');
+        if (!canShowPhone) {
+            users.forEach(u => {
+                if (u.profile?.phone && u.profile.phone !== "-") {
+                    u.profile.phone = this._maskPhoneNumber(u.profile.phone);
+                }
+            });
+        }
+
         return {
             users,
             total,
@@ -113,14 +133,23 @@ export class UserService {
     /**
      * Get users from a specific organization's database
      */
-    async getOrganizationUsers(organization, limit = 10, page = 1) {
+    async getOrganizationUsers(organization, limit = 10, page = 1, requesterPermissions = []) {
         const skip = (page - 1) * limit;
 
         const orgConnection = await getOrganizationConnection(organization);
         const ClientUser = getClientUserModel(orgConnection);
 
-        const users = await ClientUser.find({ isActive: true }).skip(skip).limit(limit);
+        const users = await ClientUser.find({ isActive: true }).skip(skip).limit(limit).lean();
         const total = await ClientUser.countDocuments({ isActive: true });
+
+        const canShowPhone = requesterPermissions.includes('show_user_phone_number');
+        if (!canShowPhone) {
+            users.forEach(u => {
+                if (u.profile?.phone && u.profile.phone !== "-") {
+                    u.profile.phone = this._maskPhoneNumber(u.profile.phone);
+                }
+            });
+        }
 
         return { users, total, page, limit };
     }

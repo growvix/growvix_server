@@ -88,6 +88,7 @@ export class AuthService {
 
         const userObj = user.toObject();
         delete userObj.password;
+        const permissions = user.permissions || [];
 
         // Return user data with profile_id instead of uuid
         return {
@@ -100,7 +101,7 @@ export class AuthService {
             lastName: user.profile.lastName,
             email: user.profile.email,
             role: user.role,
-            permissions: user.permissions || []
+            permissions: permissions
         };
     }
     async cplogin(data) {
@@ -190,6 +191,7 @@ export class AuthService {
         }
 
         const token = signToken(targetUser._id, targetUser.role);
+        const permissions = targetUser.permissions || [];
 
         return {
             user_id: targetUser._id.toString(),
@@ -200,7 +202,7 @@ export class AuthService {
             email: targetUser.profile.email,
             token,
             role: targetUser.role,
-            permissions: targetUser.permissions || []
+            permissions: permissions
         };
     }
 }

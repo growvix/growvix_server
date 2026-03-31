@@ -37,6 +37,11 @@ export class UserService {
             throw new AppError('Organization is required', 400);
         }
 
+        // Prevent saving masked phone numbers
+        if (phone && phone.startsWith('*')) {
+            throw new AppError('Cannot create user with a masked phone number', 400);
+        }
+
         // Check if user already exists in global database
         const existingUser = await User.findOne({ 'profile.email': email });
         if (existingUser) {
@@ -160,6 +165,15 @@ export class UserService {
             const existing = await User.findOne({ 'profile.email': data.profile.email, _id: { $ne: id } });
             if (existing) {
                 throw new AppError('Email already in use', 400);
+            }
+        }
+
+        // Prevent overwriting with masked phone numbers
+        if (data.profile?.phone && data.profile.phone.startsWith('*')) {
+            delete data.profile.phone;
+            // Also delete if it's the only field in profile to avoid empty profile update
+            if (Object.keys(data.profile).length === 0) {
+                delete data.profile;
             }
         }
 

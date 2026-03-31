@@ -2,9 +2,8 @@
 import { leadService } from '../services/lead.service.js';
 import { leadActivityService } from '../services/leadActivity.service.js';
 import { projectService } from '../services/project.service.js';
+import { userService } from '../services/user.service.js';
 import { leadStageService } from '../services/leadStage.service.js';
-import { getOrganizationConnection } from '../config/multiTenantDb.js';
-import { getClientUserModel } from '../models/clientUser.model.js';
 
 export const resolvers = {
     Query: {
@@ -72,11 +71,9 @@ export const resolvers = {
                 })),
             };
         },
-        getOrganizationUsers: async (_, { organization }) => {
-            const orgConn = await getOrganizationConnection(organization);
-            const ClientUser = getClientUserModel(orgConn);
-            const users = await ClientUser.find({ isActive: true }).lean();
-            return users.map(u => ({
+        getOrganizationUsers: async (_, { organization }, context) => {
+            const result = await userService.getOrganizationUsers(organization, 100, 1, context.user?.permissions || []);
+            return (result.users || []).map(u => ({
                 _id: u._id?.toString() || '',
                 globalUserId: u.globalUserId?.toString() || '',
                 profile: u.profile || null,
@@ -86,10 +83,10 @@ export const resolvers = {
         },
     },
     ProjectSummary: {
-        bookedUnits: async (parent) => {
+        bookedUnits: async (parent, _, context) => {
             if (!parent.organization || !parent.product_id) return null;
             try {
-                return await projectService.getProjectBookedUnits(parent.organization, parent.product_id);
+                return await projectService.getProjectBookedUnits(parent.organization, parent.product_id, context.user?.permissions || []);
             } catch (err) {
                 console.error(`Failed to fetch booked units for project ${parent.product_id}:`, err.message);
                 return [];

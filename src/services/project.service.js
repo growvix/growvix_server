@@ -358,7 +358,7 @@ export class ProjectService {
         }
     }
 
-    async getProjectBookedUnits(organization, productId) {
+    async getProjectBookedUnits(organization, productId, requesterPermissions = []) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -413,19 +413,33 @@ export class ProjectService {
                 }
             }
 
-            // Fetch missing profileIds from Leads
+            // Fetch missing or masked phone numbers from Leads
             const leadModel = getLeadModel(orgConn);
+            const canShowLeadPhone = (requesterPermissions || []).includes('view_lead_phone');
 
             for (let i = 0; i < bookedItems.length; i++) {
                 const item = bookedItems[i];
-                if (item.bookedBy && item.bookedBy.leadUuid && !item.bookedBy.profileId) {
-                    try {
-                        const lead = await leadModel.findOne({ _id: item.bookedBy.leadUuid }).select('profile_id');
-                        if (lead) {
-                            item.bookedBy.profileId = lead.profile_id;
+                if (item.bookedBy && item.bookedBy.leadUuid) {
+                    const needsHealing = !item.bookedBy.phone || item.bookedBy.phone.startsWith('*');
+                    const needsProfileId = !item.bookedBy.profileId;
+
+                    if (needsHealing || needsProfileId) {
+                        try {
+                            const lead = await leadModel.findOne({ _id: item.bookedBy.leadUuid }).select('profile_id profile.phone').lean();
+                            if (lead) {
+                                if (needsProfileId) item.bookedBy.profileId = lead.profile_id;
+                                if (needsHealing && lead.profile?.phone) {
+                                    item.bookedBy.phone = lead.profile.phone;
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Error healing lead data for UUID ${item.bookedBy.leadUuid}:`, error.message);
                         }
-                    } catch (error) {
-                        console.error(`Error fetching lead profile ID for UUID ${item.bookedBy.leadUuid}:`, error.message);
+                    }
+
+                    // Apply masking based on permission
+                    if (!canShowLeadPhone && item.bookedBy.phone && item.bookedBy.phone !== "-") {
+                        item.bookedBy.phone = this._maskPhoneNumber(item.bookedBy.phone);
                     }
                 }
             }
@@ -444,7 +458,7 @@ export class ProjectService {
         }
     }
 
-    async getAllBookedUnits(organization, filters = {}) {
+    async getAllBookedUnits(organization, filters = {}, requesterPermissions = []) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -455,9 +469,6 @@ export class ProjectService {
 
             const bookedItems = [];
 
-            // We use simple JS filtering instead of complex MongoDB aggregations here 
-            // since the number of projects/booked units is usually small enough for memory processing
-            // For huge datasets, we'd use robust MongoDB Aggregations.
             const query = {};
             if (filters.projectId) {
                 query.product_id = parseInt(filters.projectId);
@@ -476,9 +487,6 @@ export class ProjectService {
                                     new Date(plot.bookedBy.bookedAt) <= new Date(filters.endDate + 'T23:59:59.999Z'));
 
                             const userMatch = !filters.userId || plot.bookedBy?.userId === filters.userId;
-
-                            // Note: Team filtering would require a user lookup which we'll skip for now
-                            // since the calendar component primarily relies on date/user/project.
 
                             if (dateMatch && userMatch) {
                                 bookedItems.push({
@@ -524,19 +532,33 @@ export class ProjectService {
                 }
             }
 
-            // Fetch missing profileIds from Leads
+            // Fetch missing or masked phone numbers from Leads
             const leadModel = getLeadModel(orgConn);
+            const canShowLeadPhone = (requesterPermissions || []).includes('view_lead_phone');
 
             for (let i = 0; i < bookedItems.length; i++) {
                 const item = bookedItems[i];
-                if (item.bookedBy && item.bookedBy.leadUuid && !item.bookedBy.profileId) {
-                    try {
-                        const lead = await leadModel.findOne({ _id: item.bookedBy.leadUuid }).select('profile_id');
-                        if (lead) {
-                            item.bookedBy.profileId = lead.profile_id;
+                if (item.bookedBy && item.bookedBy.leadUuid) {
+                    const needsHealing = !item.bookedBy.phone || item.bookedBy.phone.startsWith('*');
+                    const needsProfileId = !item.bookedBy.profileId;
+
+                    if (needsHealing || needsProfileId) {
+                        try {
+                            const lead = await leadModel.findOne({ _id: item.bookedBy.leadUuid }).select('profile_id profile.phone').lean();
+                            if (lead) {
+                                if (needsProfileId) item.bookedBy.profileId = lead.profile_id;
+                                if (needsHealing && lead.profile?.phone) {
+                                    item.bookedBy.phone = lead.profile.phone;
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Error healing lead data for UUID ${item.bookedBy.leadUuid}:`, error.message);
                         }
-                    } catch (error) {
-                        console.error(`Error fetching lead profile ID for UUID ${item.bookedBy.leadUuid}:`, error.message);
+                    }
+
+                    // Apply masking based on permission
+                    if (!canShowLeadPhone && item.bookedBy.phone && item.bookedBy.phone !== "-") {
+                        item.bookedBy.phone = this._maskPhoneNumber(item.bookedBy.phone);
                     }
                 }
             }
@@ -546,6 +568,11 @@ export class ProjectService {
             console.error(err);
             throw new AppError('Failed to fetch all booked units: ' + err.message, 500);
         }
+    }
+
+    _maskPhoneNumber(phone) {
+        if (!phone || phone === "-" || phone.length <= 2) return phone;
+        return `********${phone.slice(-2)}`;
     }
 }
 

@@ -88,7 +88,13 @@ export class AuthService {
 
         const userObj = user.toObject();
         delete userObj.password;
-        const permissions = user.permissions || [];
+        
+        let permissions = user.permissions || [];
+        // Auto-grant administrative permissions to admins
+        if (user.role === 'admin') {
+            const adminPerms = ['manage_users', 'manage_teams', 'show_user_phone_number', 'view_lead_phone'];
+            permissions = [...new Set([...permissions, ...adminPerms])];
+        }
 
         // Return user data with profile_id instead of uuid
         return {
@@ -191,7 +197,12 @@ export class AuthService {
         }
 
         const token = signToken(targetUser._id, targetUser.role);
-        const permissions = targetUser.permissions || [];
+        let permissions = targetUser.permissions || [];
+        // Auto-grant administrative permissions to admins
+        if (targetUser.role === 'admin') {
+            const adminPerms = ['manage_users', 'manage_teams', 'show_user_phone_number', 'view_lead_phone'];
+            permissions = [...new Set([...permissions, ...adminPerms])];
+        }
 
         return {
             user_id: targetUser._id.toString(),

@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import jwt from 'jsonwebtoken';
+import { env } from './config/index.js';
+import { User } from './models/user.model.js';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@as-integrations/express5';
 import swaggerUi from 'swagger-ui-express';
@@ -22,6 +25,8 @@ app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use('/uploads/mail-templates', express.static(path.join(__dirname, '../uploads/mail_templates')));
+app.use('/uploads/mail_templates', express.static(path.join(__dirname, '../uploads/mail_templates')));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Swagger API docs
@@ -42,7 +47,24 @@ const apolloServer = new ApolloServer({
 
 // Start Apollo Server and apply middleware
 await apolloServer.start();
-app.use('/graphql', expressMiddleware(apolloServer));
+app.use('/graphql', expressMiddleware(apolloServer, {
+    context: async ({ req }) => {
+        const authHeader = req.headers.authorization || '';
+        if (authHeader.startsWith('Bearer ')) {
+            const token = authHeader.split(' ')[1];
+            try {
+                const decoded = jwt.verify(token, env.JWT_SECRET);
+                const user = await User.findById(decoded.id).select('permissions role profile');
+                if (user) {
+                    return { user };
+                }
+            } catch (err) {
+                console.error('[GraphQL Context] Token verification failed:', err.message);
+            }
+        }
+        return { user: null };
+    },
+}));
 
 // gRPC/Connect routes
 app.use('/grpc', grpcRoutes);

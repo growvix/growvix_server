@@ -100,6 +100,33 @@ router.post('/login', validate(loginSchema), authController.login);
 
 /**
  * @swagger
+ * /api/auth/impersonate:
+ *   post:
+ *     summary: Impersonate user (Admin only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [targetUserId]
+ *             properties:
+ *               targetUserId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Impersonation successful
+ *       403:
+ *         description: Not authorized
+ */
+import { protect, authorize } from '../middleware/auth.middleware.js';
+router.post('/impersonate', protect, authorize('admin'), authController.impersonate);
+
+/**
+ * @swagger
  * /api/auth/cplogin:
  *   post:
  *     summary: Login Channel Partner user
@@ -121,34 +148,6 @@ router.post('/login', validate(loginSchema), authController.login);
  *     responses:
  *       200:
  *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     user_id:
- *                       type: string
- *                     profile_id:
- *                       type: number
- *                     organization:
- *                       type: string
- *                     firstName:
- *                       type: string
- *                     lastName:
- *                       type: string
- *                     email:
- *                       type: string
- *                     token:
- *                       type: string
- *                     role:
- *                       type: string
  *       401:
  *         description: Invalid credentials
  */

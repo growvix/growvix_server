@@ -43,12 +43,13 @@ export class TeamService {
             isActive: true,
         });
 
-        // Update users' teams array if members provided
+        // Update users' teams array if members provided (in both DBs)
         if (memberIds && memberIds.length > 0) {
-            await ClientUser.updateMany(
-                { _id: { $in: memberIds } },
-                { $addToSet: { teams: { teamId: team._id, teamName: team.name } } }
-            );
+            const teamUpdate = { $addToSet: { teams: { teamId: team._id, teamName: team.name } } };
+            // Org db
+            await ClientUser.updateMany({ _id: { $in: memberIds } }, teamUpdate);
+            // Global db
+            await User.updateMany({ _id: { $in: memberIds } }, teamUpdate);
         }
 
         return team;
@@ -139,11 +140,12 @@ export class TeamService {
         // Soft delete
         await ClientTeam.findByIdAndUpdate(teamId, { isActive: false });
 
-        // Remove team reference from all members
-        await ClientUser.updateMany(
-            { 'teams.teamId': teamId },
-            { $pull: { teams: { teamId: teamId } } }
-        );
+        // Remove team reference from all members (both DBs)
+        const teamPullUpdate = { $pull: { teams: { teamId: teamId } } };
+        // Org db
+        await ClientUser.updateMany({ 'teams.teamId': teamId }, teamPullUpdate);
+        // Global db
+        await User.updateMany({ 'teams.teamId': teamId }, teamPullUpdate);
 
         return team;
     }
@@ -200,11 +202,12 @@ export class TeamService {
                 $addToSet: { members: { $each: addedUserIds } }
             });
 
-            // Update users' teams array
-            await ClientUser.updateMany(
-                { _id: { $in: addedUserIds } },
-                { $addToSet: { teams: { teamId: team._id, teamName: team.name } } }
-            );
+            // Update users' teams array (in both DBs)
+            const teamUpdate = { $addToSet: { teams: { teamId: team._id, teamName: team.name } } };
+            // Org db
+            await ClientUser.updateMany({ _id: { $in: addedUserIds } }, teamUpdate);
+            // Global db
+            await User.updateMany({ _id: { $in: addedUserIds } }, teamUpdate);
         }
 
         return { addedCount: addedUserIds.length, warnings };
@@ -226,10 +229,12 @@ export class TeamService {
             $pull: { members: userId }
         });
 
-        // Remove team from user's teams array
-        await ClientUser.findByIdAndUpdate(userId, {
-            $pull: { teams: { teamId: teamId } }
-        });
+        // Remove team from user's teams array (both DBs)
+        const teamRemoveUpdate = { $pull: { teams: { teamId: teamId } } };
+        // Org db
+        await ClientUser.findByIdAndUpdate(userId, teamRemoveUpdate);
+        // Global db
+        await User.findByIdAndUpdate(userId, teamRemoveUpdate);
 
         return { success: true };
     }

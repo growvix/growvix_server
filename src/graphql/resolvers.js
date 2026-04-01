@@ -2,9 +2,8 @@
 import { leadService } from '../services/lead.service.js';
 import { leadActivityService } from '../services/leadActivity.service.js';
 import { projectService } from '../services/project.service.js';
+import { userService } from '../services/user.service.js';
 import { leadStageService } from '../services/leadStage.service.js';
-import { getOrganizationConnection } from '../config/multiTenantDb.js';
-import { getClientUserModel } from '../models/clientUser.model.js';
 
 export const resolvers = {
     Query: {
@@ -48,12 +47,18 @@ export const resolvers = {
         getAllProjects: async (_, { organization }) => {
             const projects = await projectService.getAllProjects(organization);
             return projects.map(p => ({
-                product_id: p.product_id,
-                name: p.name,
-                location: p.location || null,
-                property: p.property || null,
+                ...p,
+                organization, // Inject organization for field resolvers
                 img_location: p.img_location || null,
             }));
+        },
+        getProjectById: async (_, { organization, id }) => {
+            const project = await projectService.getProjectById(organization, id);
+            if (!project) return null;
+            return {
+                ...project.toObject(),
+                organization // Inject organization for field resolvers
+            };
         },
         getLeadStages: async (_, { organization }) => {
             const result = await leadStageService.getStages(organization);
@@ -66,11 +71,9 @@ export const resolvers = {
                 })),
             };
         },
-        getOrganizationUsers: async (_, { organization }) => {
-            const orgConn = await getOrganizationConnection(organization);
-            const ClientUser = getClientUserModel(orgConn);
-            const users = await ClientUser.find({ isActive: true }).lean();
-            return users.map(u => ({
+        getOrganizationUsers: async (_, { organization }, context) => {
+            const result = await userService.getOrganizationUsers(organization, 100, 1, context.user?.permissions || []);
+            return (result.users || []).map(u => ({
                 _id: u._id?.toString() || '',
                 globalUserId: u.globalUserId?.toString() || '',
                 profile: u.profile || null,
@@ -78,6 +81,17 @@ export const resolvers = {
                 isActive: u.isActive ?? true,
             }));
         },
+    },
+    ProjectSummary: {
+        bookedUnits: async (parent, _, context) => {
+            if (!parent.organization || !parent.product_id) return null;
+            try {
+                return await projectService.getProjectBookedUnits(parent.organization, parent.product_id, context.user?.permissions || []);
+            } catch (err) {
+                console.error(`Failed to fetch booked units for project ${parent.product_id}:`, err.message);
+                return [];
+            }
+        }
     },
     Mutation: {
         createLeadActivity: async (_, { organization, input }) => {
@@ -104,8 +118,8 @@ export const resolvers = {
         removeInterestedProject: async (_, { organization, leadId, projectId }) => {
             return await leadService.removeInterestedProject(organization, leadId, projectId);
         },
-        toggleImportantActivity: async (_, { organization, leadId, activityId, profileId }) => {
-            return await leadService.toggleImportantActivity(organization, leadId, activityId, profileId);
+        toggleImportantActivity: async (_, { organization, leadId, activityId, userId }) => {
+            return await leadService.toggleImportantActivity(organization, leadId, activityId, userId);
         },
     },
     LeadDetail: {

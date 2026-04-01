@@ -5,12 +5,23 @@ import { AppError } from '../utils/apiResponse.util.js';
 import { hashPassword } from '../utils/security.util.js';
 
 export class UserService {
-    async getUserById(id) {
-        const user = await User.findById(id);
+    async getUserById(id, requester = { permissions: [], role: '' }) {
+        const user = await User.findById(id).lean();
         if (!user) {
             throw new AppError('User not found', 404);
         }
+
+        const canShowPhone = (requester.permissions || []).includes('show_user_phone_number') || requester.role === 'admin';
+        if (!canShowPhone && user.profile?.phone && user.profile.phone !== "-") {
+            user.profile.phone = this._maskPhoneNumber(user.profile.phone);
+        }
+
         return user;
+    }
+
+    _maskPhoneNumber(phone) {
+        if (!phone || phone === "-" || phone.length <= 2) return phone;
+        return `********${phone.slice(-2)}`;
     }
 
     /**
@@ -26,16 +37,26 @@ export class UserService {
             throw new AppError('Organization is required', 400);
         }
 
+        // Prevent saving masked phone numbers
+        if (phone && phone.startsWith('*')) {
+            throw new AppError('Cannot create user with a masked phone number', 400);
+        }
+
         // Check if user already exists in global database
         const existingUser = await User.findOne({ 'profile.email': email });
         if (existingUser) {
             throw new AppError('Email already in use', 400);
         }
 
+        // Calculate the next sequential profile_id
+        const lastUser = await User.findOne().sort({ profile_id: -1 }).select('profile_id');
+        const nextProfileId = lastUser?.profile_id ? lastUser.profile_id + 1 : 1;
+
         const hashedPassword = await hashPassword(password);
 
         // Step 1: Create user in global admin database
         const newUser = await User.create({
+            profile_id: nextProfileId,
             organization,
             profile: {
                 firstName,
@@ -44,7 +65,8 @@ export class UserService {
                 phone
             },
             password: hashedPassword,
-            role
+            role,
+            isActive: true
         });
 
         // Step 2: Store a copy in organization-specific database
@@ -57,14 +79,16 @@ export class UserService {
 
             const createdClientUser = await ClientUser.create({
                 _id: newUser._id,
+                profile_id: newUser.profile_id,
                 globalUserId: newUser._id,
+                organization: newUser.organization,
                 profile: {
                     firstName,
                     lastName,
                     email,
                     phone
                 },
-                role,
+                role: newUser.role,
                 isActive: true
             });
 
@@ -84,7 +108,7 @@ export class UserService {
      * Get all users from global database
      * Optionally filter by organization
      */
-    async getAllUsers({ limit = 10, page = 1, organization = null } = {}) {
+    async getAllUsers({ limit = 10, page = 1, organization = null, requester = { permissions: [], role: '' } } = {}) {
         const safeLimit = Math.max(1, parseInt(limit, 10));
         const safePage = Math.max(1, parseInt(page, 10));
         const skip = (safePage - 1) * safeLimit;
@@ -100,6 +124,15 @@ export class UserService {
             User.countDocuments(query)
         ]);
 
+        const canShowPhone = (requester.permissions || []).includes('show_user_phone_number') || requester.role === 'admin';
+        if (!canShowPhone) {
+            users.forEach(u => {
+                if (u.profile?.phone && u.profile.phone !== "-") {
+                    u.profile.phone = this._maskPhoneNumber(u.profile.phone);
+                }
+            });
+        }
+
         return {
             users,
             total,
@@ -113,14 +146,23 @@ export class UserService {
     /**
      * Get users from a specific organization's database
      */
-    async getOrganizationUsers(organization, limit = 10, page = 1) {
+    async getOrganizationUsers(organization, limit = 10, page = 1, requester = { permissions: [], role: '' }) {
         const skip = (page - 1) * limit;
 
         const orgConnection = await getOrganizationConnection(organization);
         const ClientUser = getClientUserModel(orgConnection);
 
-        const users = await ClientUser.find({ isActive: true }).skip(skip).limit(limit);
+        const users = await ClientUser.find({ isActive: true }).skip(skip).limit(limit).lean();
         const total = await ClientUser.countDocuments({ isActive: true });
+
+        const canShowPhone = (requester.permissions || []).includes('show_user_phone_number') || requester.role === 'admin';
+        if (!canShowPhone) {
+            users.forEach(u => {
+                if (u.profile?.phone && u.profile.phone !== "-") {
+                    u.profile.phone = this._maskPhoneNumber(u.profile.phone);
+                }
+            });
+        }
 
         return { users, total, page, limit };
     }
@@ -131,6 +173,15 @@ export class UserService {
             const existing = await User.findOne({ 'profile.email': data.profile.email, _id: { $ne: id } });
             if (existing) {
                 throw new AppError('Email already in use', 400);
+            }
+        }
+
+        // Prevent overwriting with masked phone numbers
+        if (data.profile?.phone && data.profile.phone.startsWith('*')) {
+            delete data.profile.phone;
+            // Also delete if it's the only field in profile to avoid empty profile update
+            if (Object.keys(data.profile).length === 0) {
+                delete data.profile;
             }
         }
 

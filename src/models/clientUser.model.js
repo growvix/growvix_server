@@ -28,7 +28,7 @@ const UserSchemaDefinition = {
         profileImagePath: { type: String },
     },
     password: { type: String, select: false },
-    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    role: { type: String, enum: ['user', 'admin', 'manager'], default: 'user' },
     department: { type: String, enum: ['pre-sales', 'sales', 'post-sales'] },
     isActive: { type: Boolean, default: true },
     teams: [{

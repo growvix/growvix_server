@@ -19,22 +19,23 @@ export const googleWebhookController = {
 
         try {
             const { google_key, ...payload } = req.body;
+            console.log("google response", req.body);
 
             // ── Step 1: Validate using global DB ──
-            const config = await googleWebhookService.validateAndGetConfig(google_key);
-            if (!config) {
-                console.warn(`[Google Webhook] Invalid or unknown google_key: ${google_key}`);
-                return; // Response already sent, just stop processing
-            }
+            // const config = await googleWebhookService.validateAndGetConfig(google_key);
+            // if (!config) {
+            //     console.warn(`[Google Webhook] Invalid or unknown google_key: ${google_key}`);
+            //     return; // Response already sent, just stop processing
+            // }
 
-            const { organization } = config;
-            console.log(`[Google Webhook] Valid key. Organization: ${organization}`);
+            // const { organization } = config;
+            // console.log(`[Google Webhook] Valid key. Organization: ${organization}`);
 
-            // ── Step 2: Save raw event (non-blocking) ──
-            googleWebhookService.saveRawEvent(organization, 'lead_form_submission', payload);
+            // // ── Step 2: Save raw event (non-blocking) ──
+            // googleWebhookService.saveRawEvent(organization, 'lead_form_submission', payload);
 
-            // ── Step 3: Process lead & assign via round-robin ──
-            await googleWebhookService.processLeadFormSubmission(organization, payload);
+            // // ── Step 3: Process lead & assign via round-robin ──
+            // await googleWebhookService.processLeadFormSubmission(organization, payload);
 
         } catch (error) {
             // Log but don't re-respond — response already sent above

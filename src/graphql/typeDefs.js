@@ -80,12 +80,36 @@ export const typeDefs = `#graphql
         videos: String
     }
 
+    type BookedBy {
+        leadName: String
+        leadUuid: String
+        profileId: Int
+        phone: String
+        userId: String
+        userName: String
+        bookedAt: String
+    }
+
+    type BookedItem {
+        id: String
+        label: String
+        type: String
+        bookedBy: BookedBy
+        project_name: String
+        project_id: Int
+    }
+
     type ProjectSummary {
         product_id: Int!
         name: String!
         location: String
         property: String
         img_location: ProjectImageLocation
+        blockCount: Int
+        totalUnits: Int
+        bookedCount: Int
+        bookedUnits: [BookedItem]
+        createdAt: String
     }
 
     type LeadDetail {
@@ -201,6 +225,7 @@ export const typeDefs = `#graphql
         getLeadActivitiesByProfileId(organization: String!, profileId: Int!): [LeadActivity!]!
         getSiteVisitActivities(organization: String!, startDate: String, endDate: String, userId: String, teamId: String, projectId: Int): [SiteVisitCalendarEntry!]!
         getAllProjects(organization: String!): [ProjectSummary!]!
+        getProjectById(organization: String!, id: Int!): ProjectSummary
         getLeadStages(organization: String!): LeadStageConfig
         getOrganizationUsers(organization: String!): [OrgUser!]!
     }
@@ -235,6 +260,6 @@ export const typeDefs = `#graphql
         updatePropertyRequirement(organization: String!, leadId: String!, input: UpdatePropertyRequirementInput!): LeadDetail
         addInterestedProject(organization: String!, leadId: String!, projectId: Int!, projectName: String!): LeadDetail
         removeInterestedProject(organization: String!, leadId: String!, projectId: Int!): LeadDetail
-        toggleImportantActivity(organization: String!, leadId: String!, activityId: String!, profileId: Int!): LeadDetail
+        toggleImportantActivity(organization: String!, leadId: String!, activityId: String!, userId: String!): LeadDetail
     }
 `;

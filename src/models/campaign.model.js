@@ -10,9 +10,21 @@ const CampaignSchema = new Schema(
         },
         campaignName: { type: String, required: true },
         project: {
-            projectId: { type: String, required: true },
-            projectName: { type: String, required: true }
+            projectId: { type: String },
+            projectName: { type: String }
         },
+        inputChannels: [
+            {
+                uuid: { type: String, default: () => uuidv4() },
+                publisher: { type: String },
+                source: { type: String },
+                subSource: { type: String },
+                medium: { type: String },
+                campaignType: { type: String },
+                integrationType: { type: String },
+                redirectionUrl: { type: String }
+            }
+        ],
         organization: { type: String, required: true, index: true },
     },
     {

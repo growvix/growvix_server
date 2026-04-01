@@ -4,7 +4,8 @@ import { leadActivityService } from '../services/leadActivity.service.js';
 import { projectService } from '../services/project.service.js';
 import { userService } from '../services/user.service.js';
 import { leadStageService } from '../services/leadStage.service.js';
-import { campaignService } from '../services/campaign.service.js';
+import { getOrganizationConnection } from '../config/multiTenantDb.js';
+import { getClientUserModel } from '../models/clientUser.model.js';
 
 export const resolvers = {
     Query: {
@@ -82,9 +83,7 @@ export const resolvers = {
                 isActive: u.isActive ?? true,
             }));
         },
-        getAllCampaigns: async (_, { organization }) => {
-            return await campaignService.getCampaigns(organization);
-        },
+
     },
     ProjectSummary: {
         bookedUnits: async (parent, _, context) => {
@@ -125,13 +124,7 @@ export const resolvers = {
         toggleImportantActivity: async (_, { organization, leadId, activityId, userId }) => {
             return await leadService.toggleImportantActivity(organization, leadId, activityId, userId);
         },
-        createCampaign: async (_, { organization, campaignName, projectId, projectName }) => {
-            return await campaignService.createCampaign(organization, {
-                campaignName,
-                projectId,
-                projectName
-            });
-        },
+
     },
     LeadDetail: {
         activities: async (parent, _, context) => {

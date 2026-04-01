@@ -1,4 +1,8 @@
 import { googleWebhookService } from '../services/googleWebhook.service.js';
+import { GoogleForm } from '../models/googleForm.model.js';
+import { getOrganizationConnection } from '../config/multiTenantDb.js';
+import { getGoogleMappingModel } from '../models/googleMapping.model.js';
+import { getGoogleAdIntegrationModel } from '../models/googleAdIntegration.model.js';
 import { ApiResponse } from '../utils/apiResponse.util.js';
 
 export const googleWebhookController = {
@@ -6,11 +10,11 @@ export const googleWebhookController = {
      * POST /api/webhooks/google
      *
      * Flow:
-     * 1. Extract google_key from req.body
-     * 2. Look up the key in global_admin.google_config
-     * 3. Get organization from matched config document
-     * 4. Store the lead in the org's multi-tenant DB
-     * 5. Assign the lead to a pre-sales user via round-robin
+     * 1. Extract google_key (secret) from req.body
+     * 2. Look up the key in global_admin.google_form
+     * 3. Get organization + form_id from matched document
+     * 4. If integration is in test mode (status=false): store payload in google_mapping.test_data
+     * 5. If integration is active (status=true): use field_mapping to create a lead
      * 6. Always respond 200 (Google requires this to stop retries)
      */
     receive: async (req, res) => {
@@ -19,26 +23,60 @@ export const googleWebhookController = {
 
         try {
             const { google_key, ...payload } = req.body;
-            console.log("google response", req.body);
+            console.log("[Google Webhook] Received payload:", JSON.stringify(req.body).substring(0, 300));
 
-            // ── Step 1: Validate using global DB ──
-            // const config = await googleWebhookService.validateAndGetConfig(google_key);
-            // if (!config) {
-            //     console.warn(`[Google Webhook] Invalid or unknown google_key: ${google_key}`);
-            //     return; // Response already sent, just stop processing
-            // }
+            if (!google_key) {
+                console.warn('[Google Webhook] No google_key provided in payload');
+                return;
+            }
 
-            // const { organization } = config;
-            // console.log(`[Google Webhook] Valid key. Organization: ${organization}`);
+            // ── Step 1: Look up secret in global google_form collection ──
+            const formConfig = await GoogleForm.findOne({ secret_key: google_key }).lean();
+            if (!formConfig) {
+                console.warn(`[Google Webhook] Invalid or unknown google_key: ${google_key}`);
+                return;
+            }
 
-            // // ── Step 2: Save raw event (non-blocking) ──
-            // googleWebhookService.saveRawEvent(organization, 'lead_form_submission', payload);
+            const { organization, form_id, integration_id } = formConfig;
+            console.log(`[Google Webhook] Matched org: ${organization} | form_id: ${form_id} | integration: ${integration_id}`);
 
-            // // ── Step 3: Process lead & assign via round-robin ──
-            // await googleWebhookService.processLeadFormSubmission(organization, payload);
+            // ── Step 2: Get the integration and mapping from tenant DB ──
+            const orgConn = await getOrganizationConnection(organization);
+            const GoogleAdIntegration = getGoogleAdIntegrationModel(orgConn);
+            const GoogleMapping = getGoogleMappingModel(orgConn);
+
+            const integration = await GoogleAdIntegration.findById(integration_id);
+            if (!integration) {
+                console.warn(`[Google Webhook] Integration ${integration_id} not found in org ${organization}`);
+                return;
+            }
+
+            if (!integration.status) {
+                // ── TEST MODE: Store payload in google_mapping.test_data ──
+                console.log(`[Google Webhook] Test mode — storing payload for integration ${integration_id}`);
+                await GoogleMapping.findOneAndUpdate(
+                    { integration_id: integration._id, organization },
+                    {
+                        $set: {
+                            test_data: payload,
+                            test_received_at: new Date(),
+                        }
+                    }
+                );
+                console.log('[Google Webhook] Test data stored successfully');
+            } else {
+                // ── ACTIVE MODE: Create lead using saved field_mapping ──
+                console.log(`[Google Webhook] Active mode — creating lead for integration ${integration_id}`);
+
+                // Save raw event for audit
+                googleWebhookService.saveRawEvent(organization, 'lead_form_submission', payload);
+
+                // Process lead using the field mapping
+                const mapping = await GoogleMapping.findOne({ integration_id: integration._id, organization });
+                await googleWebhookService.processLeadWithMapping(organization, payload, integration, mapping);
+            }
 
         } catch (error) {
-            // Log but don't re-respond — response already sent above
             console.error('[Google Webhook] Error processing webhook:', error.message);
         }
     },
@@ -54,7 +92,6 @@ export const googleWebhookController = {
                 return res.status(400).json(ApiResponse.error('organization is required', 400));
             }
 
-            const { getOrganizationConnection } = await import('../config/multiTenantDb.js');
             const { getGoogleWebhookEventModel } = await import('../models/googleWebhookEvent.model.js');
             const orgConn = await getOrganizationConnection(organization);
             const GoogleWebhookEvent = getGoogleWebhookEventModel(orgConn);

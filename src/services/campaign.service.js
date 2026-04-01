@@ -26,7 +26,8 @@ export class CampaignService {
                 project: {
                     projectId: data.projectId,
                     projectName: data.projectName
-                }
+                },
+                inputChannels: data.inputChannels || []
             });
 
             return campaign;

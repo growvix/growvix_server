@@ -32,8 +32,7 @@ class GoogleWebhookService {
     }
 
     /**
-     * STEP 2: Process the lead and save it to the org's multi-tenant DB.
-     * Assigns the lead to a pre-sales user via round-robin.
+     * STEP 2 (LEGACY): Process the lead using hardcoded field mapping.
      */
     async processLeadFormSubmission(organization, data) {
         const orgConn = await getOrganizationConnection(organization);
@@ -41,16 +40,12 @@ class GoogleWebhookService {
 
         const cols = data.user_column_data || [];
 
-        // ── Map Google fields using column_id ──
         const name = getField(cols, 'FULL_NAME') || `Google Lead`;
         const email = getField(cols, 'EMAIL');
         const phone = getField(cols, 'PHONE_NUMBER');
-        const company = getField(cols, 'COMPANY_NAME');
 
-        // Round-robin assignment to a pre-sales user
         const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
 
-        // Build the acquired source tracking object
         const acquired = {
             campaign: String(data.campaign_id || ''),
             source: 'Google Ads',
@@ -60,7 +55,6 @@ class GoogleWebhookService {
             medium: 'Google Lead Form',
         };
 
-        // Collect all custom question answers as requirements array
         const customFields = ['FULL_NAME', 'EMAIL', 'PHONE_NUMBER', 'COMPANY_NAME', 'OVER_18_AGE'];
         const requirements = cols
             .filter(f => !customFields.includes(f.column_id) && f.string_value)
@@ -90,8 +84,85 @@ class GoogleWebhookService {
     }
 
     /**
+     * STEP 2 (NEW): Process the lead using saved field_mapping from google_mapping.
+     * Maps Google fields to CRM fields dynamically based on user configuration.
+     */
+    async processLeadWithMapping(organization, data, integration, mapping) {
+        const orgConn = await getOrganizationConnection(organization);
+        const Lead = getLeadModel(orgConn);
+
+        const cols = data.user_column_data || [];
+        const fieldMap = mapping?.field_mapping || [];
+
+        // Build profile and requirements from mapping
+        const profile = { name: 'Google Lead' };
+        const requirements = [];
+
+        for (const col of cols) {
+            const mapEntry = fieldMap.find(m => m.google_field === col.column_id);
+            const value = col.string_value || '';
+
+            if (!value) continue;
+
+            if (mapEntry && mapEntry.crm_field !== 'requirement') {
+                // Mapped to a CRM field (e.g. "profile.name", "profile.email", "profile.phone", "profile.location")
+                const parts = mapEntry.crm_field.split('.');
+                if (parts[0] === 'profile' && parts[1]) {
+                    profile[parts[1]] = value;
+                }
+            } else {
+                // Unmapped or explicitly marked as requirement
+                requirements.push({
+                    key: mapEntry?.google_label || col.column_id,
+                    value,
+                });
+            }
+        }
+
+        // Ensure required fields have fallbacks
+        if (!profile.name || profile.name === 'Google Lead') {
+            profile.name = 'Google Lead';
+        }
+        if (!profile.phone) {
+            profile.phone = 'N/A';
+        }
+
+        const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
+
+        const acquired = {
+            campaign: String(integration.campaign_id || ''),
+            source: integration.source || 'Google Ads',
+            sub_source: integration.sub_source || String(data.form_id || ''),
+            received: new Date(),
+            created_at: new Date(),
+            medium: 'Google Lead Form',
+        };
+
+        const profile_id = await getNextProfileId(Lead);
+
+        const lead = await Lead.create({
+            _id: uuidv4(),
+            profile_id,
+            organization,
+            profile,
+            acquired: [acquired],
+            requirements,
+            stage: 'new',
+            status: 'active',
+            exe_user: assignedUserId || undefined,
+            created_at: new Date(),
+            updated_at: new Date(),
+        });
+
+        console.log(
+            `[Google Webhook] Lead created (mapped): ${lead._id} | Name: ${profile.name} | Org: ${organization} | Assigned to: ${assignedUserId || 'unassigned'}`
+        );
+
+        return { lead, assignedUserId };
+    }
+
+    /**
      * Save the raw event payload to the org's DB for audit/replay purposes.
-     * (fire-and-forget — non-blocking)
      */
     async saveRawEvent(organization, eventType, payload) {
         try {

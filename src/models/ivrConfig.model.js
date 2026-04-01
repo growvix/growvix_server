@@ -1,18 +1,22 @@
 import mongoose, { Schema } from 'mongoose';
 
 /**
- * IVR Config Schema — stores IVR vendor auth per organization
- * Multi-tenant: accessed via getOrganizationConnection()
+ * IVR Config Schema — stores IVR vendor auth per user in an organization
+ * Collection: ivr_config (multi-tenant, accessed via getOrganizationConnection)
+ * 
+ * Fields (as per DB screenshot):
+ *   _id       : ObjectId (auto)
+ *   http_auth : String   — the MCube JWT token
+ *   user_id   : UUID     — the user this config belongs to
  */
 const IvrConfigSchemaDefinition = {
-    http_authorization: { type: String, required: true },
-    provider: { type: String, default: 'mcube' },
-    isActive: { type: Boolean, default: true },
+    http_auth: { type: String, required: true },
+    user_id: { type: mongoose.Schema.Types.UUID, required: true, index: true },
 };
 
 const schemaOptions = {
     timestamps: true,
-    collection: 'ivr',
+    collection: 'ivr_config',
 };
 
 /**

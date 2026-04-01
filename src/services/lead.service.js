@@ -35,14 +35,16 @@ export class LeadService {
             // Assign UUID v4 as _id
             data._id = uuidv4();
 
-            // Round-robin: assign to next pre-sales user
-            try {
-                const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
-                if (assignedUserId) {
-                    data.exe_user = assignedUserId;
+            // Round-robin: assign to next pre-sales user if not already provided
+            if (!data.exe_user) {
+                try {
+                    const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
+                    if (assignedUserId) {
+                        data.exe_user = assignedUserId;
+                    }
+                } catch (rrErr) {
+                    console.error('Round-robin assignment failed (lead will be unassigned):', rrErr.message);
                 }
-            } catch (rrErr) {
-                console.error('Round-robin assignment failed (lead will be unassigned):', rrErr.message);
             }
 
             const lead = await Lead.create(data);
@@ -56,9 +58,9 @@ export class LeadService {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
-        
+
         const { hasHeader = true, mappings = null, fileName = '', initiatedByName = '', initiatedByEmail = '' } = options;
-        
+
         try {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
@@ -91,8 +93,8 @@ export class LeadService {
                     Object.entries(mappings).forEach(([idx, field]) => {
                         const val = row[idx];
                         if (val === undefined || val === null) return;
-                        
-                        switch(field) {
+
+                        switch (field) {
                             case 'name': name = val; break;
                             case 'phone': phone = val; break;
                             case 'email': email = val; break;
@@ -153,16 +155,16 @@ export class LeadService {
                     leadDoc.exe_user = userId;
                 }
 
-                // Optional: round-robin assignment override if userId was not provided or specific logic wanted
-                // For now, we prefer the provided userId (uploader) or fall back to RR if needed.
-                // Re-enabling Round Robin if no direct assignment logic is strictly required to be the uploader.
-                try {
-                    const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
-                    if (assignedUserId) {
-                        leadDoc.exe_user = assignedUserId;
+                // Optional: round-robin assignment override if exe_user was not provided (uploader)
+                if (!leadDoc.exe_user) {
+                    try {
+                        const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
+                        if (assignedUserId) {
+                            leadDoc.exe_user = assignedUserId;
+                        }
+                    } catch (rrErr) {
+                        // Fallback to userId if RR fails
                     }
-                } catch (rrErr) {
-                    // Fallback to userId if RR fails
                 }
 
                 validLeads.push(leadDoc);

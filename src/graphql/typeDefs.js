@@ -203,6 +203,19 @@ export const typeDefs = `#graphql
         isActive: Boolean
     }
 
+    type CampaignProject {
+        projectId: String!
+        projectName: String!
+    }
+
+    type Campaign {
+        _id: String!
+        uuid: String!
+        campaignName: String!
+        project: CampaignProject!
+        organization: String!
+    }
+
     input CreateLeadActivityInput {
         profile_id: Int!
         lead_id: String!
@@ -228,6 +241,7 @@ export const typeDefs = `#graphql
         getProjectById(organization: String!, id: Int!): ProjectSummary
         getLeadStages(organization: String!): LeadStageConfig
         getOrganizationUsers(organization: String!): [OrgUser!]!
+        getAllCampaigns(organization: String!): [Campaign!]!
     }
 
     input UpdateLeadInput {
@@ -261,5 +275,6 @@ export const typeDefs = `#graphql
         addInterestedProject(organization: String!, leadId: String!, projectId: Int!, projectName: String!): LeadDetail
         removeInterestedProject(organization: String!, leadId: String!, projectId: Int!): LeadDetail
         toggleImportantActivity(organization: String!, leadId: String!, activityId: String!, userId: String!): LeadDetail
+        createCampaign(organization: String!, campaignName: String!, projectId: String!, projectName: String!): Campaign!
     }
 `;

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { protect } from '../middleware/auth.middleware.js';
 import { ivrService } from '../services/ivr.service.js';
 
 const router = Router();
@@ -6,28 +7,27 @@ const router = Router();
 /**
  * @route   POST /api/ivr-call
  * @desc    Initiate an IVR outbound call via MCube vendor API
+ * @access  Protected (requires auth token)
+ * @body    { organization, userId, leadId }
  */
-router.post('/', async (req, res) => {
-    const { organization, userId, assignedUser, clientPhone, leadId, leadName } = req.body;
+router.post('/', protect, async (req, res) => {
+    const { organization, userId, leadId } = req.body;
 
     console.log('=== IVR Call Request Received ===');
     console.log('Organization:', organization);
     console.log('User ID (caller):', userId);
-    console.log('Assigned User:', assignedUser);
-    console.log('Client Phone (lead):', clientPhone);
     console.log('Lead ID:', leadId);
-    console.log('Lead Name:', leadName);
     console.log('================================');
 
-    if (!organization || !userId || !clientPhone) {
+    if (!organization || !userId || !leadId) {
         return res.status(400).json({
             success: false,
-            message: 'organization, userId, and clientPhone are required',
+            message: 'organization, userId, and leadId are required',
         });
     }
 
     try {
-        const result = await ivrService.initiateCall(organization, userId, clientPhone);
+        const result = await ivrService.initiateCall(organization, userId, leadId);
         return res.status(200).json({
             success: true,
             message: 'IVR call initiated successfully',

@@ -24,6 +24,19 @@ export class UploadController {
             count: imageUrls.length
         }));
     });
+
+    uploadProfilePicture = asyncHandler(async (req, res) => {
+        if (!req.file) {
+            return res.status(400).json(ApiResponse.error('No file uploaded'));
+        }
+
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const imageUrl = `${baseUrl}/uploads/profile-pictures/${req.file.filename}`;
+
+        res.status(200).json(ApiResponse.success('Profile picture uploaded successfully', {
+            url: imageUrl
+        }));
+    });
 }
 
 export const uploadController = new UploadController();

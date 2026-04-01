@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { uploadController } from '../controllers/upload.controller.js';
-import { uploadFloorPlan } from '../middleware/upload.middleware.js';
+import { uploadFloorPlan, uploadProfilePicture } from '../middleware/upload.middleware.js';
 
 const router = Router();
 
@@ -47,5 +47,8 @@ const router = Router();
  */
 // Upload floor plan images (up to 5 at once)
 router.post('/floor-plans', uploadFloorPlan.array('images', 5), uploadController.uploadFloorPlanImages);
+
+// Upload profile picture (single image)
+router.post('/profile-picture', uploadProfilePicture.single('image'), uploadController.uploadProfilePicture);
 
 export default router;

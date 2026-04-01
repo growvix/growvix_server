@@ -11,7 +11,7 @@ export class UserController {
 
     // Get user by ID (Admin or public?)
     getUser = asyncHandler(async (req, res) => {
-        const user = await userService.getUserById(req.params.id, req.user?.permissions || []);
+        const user = await userService.getUserById(req.params.id, req.user);
         res.status(200).json(ApiResponse.success('User retrieved', user));
     });
 
@@ -24,14 +24,14 @@ export class UserController {
         let result;
         if (org) {
             // Get users from organization-specific database
-            result = await userService.getOrganizationUsers(org, Number(limit) || 50, Number(page) || 1, req.user?.permissions || []);
+            result = await userService.getOrganizationUsers(org, Number(limit) || 50, Number(page) || 1, req.user);
         } else {
             // Get all users from global database (admin view)
             result = await userService.getAllUsers({ 
                 limit: Number(limit) || 50, 
                 page: Number(page) || 1, 
                 organization: org,
-                requesterPermissions: req.user?.permissions || []
+                requester: req.user
             });
         }
         res.status(200).json(ApiResponse.success('Users retrieved', result));

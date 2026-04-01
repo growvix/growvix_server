@@ -358,7 +358,7 @@ export class ProjectService {
         }
     }
 
-    async getProjectBookedUnits(organization, productId, requesterPermissions = []) {
+    async getProjectBookedUnits(organization, productId, requester = { permissions: [], role: '' }) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -415,7 +415,7 @@ export class ProjectService {
 
             // Fetch missing or masked phone numbers from Leads
             const leadModel = getLeadModel(orgConn);
-            const canShowLeadPhone = (requesterPermissions || []).includes('view_lead_phone');
+            const canShowLeadPhone = (requester.permissions || []).includes('view_lead_phone') || requester.role === 'admin';
 
             for (let i = 0; i < bookedItems.length; i++) {
                 const item = bookedItems[i];
@@ -437,7 +437,7 @@ export class ProjectService {
                         }
                     }
 
-                    // Apply masking based on permission
+                    // Apply masking based on permission (bypass for admins)
                     if (!canShowLeadPhone && item.bookedBy.phone && item.bookedBy.phone !== "-") {
                         item.bookedBy.phone = this._maskPhoneNumber(item.bookedBy.phone);
                     }
@@ -458,7 +458,7 @@ export class ProjectService {
         }
     }
 
-    async getAllBookedUnits(organization, filters = {}, requesterPermissions = []) {
+    async getAllBookedUnits(organization, filters = {}, requester = { permissions: [], role: '' }) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -534,7 +534,7 @@ export class ProjectService {
 
             // Fetch missing or masked phone numbers from Leads
             const leadModel = getLeadModel(orgConn);
-            const canShowLeadPhone = (requesterPermissions || []).includes('view_lead_phone');
+            const canShowLeadPhone = (requester.permissions || []).includes('view_lead_phone') || requester.role === 'admin';
 
             for (let i = 0; i < bookedItems.length; i++) {
                 const item = bookedItems[i];
@@ -556,7 +556,7 @@ export class ProjectService {
                         }
                     }
 
-                    // Apply masking based on permission
+                    // Apply masking based on permission (bypass for admins)
                     if (!canShowLeadPhone && item.bookedBy.phone && item.bookedBy.phone !== "-") {
                         item.bookedBy.phone = this._maskPhoneNumber(item.bookedBy.phone);
                     }

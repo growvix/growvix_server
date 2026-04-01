@@ -48,6 +48,7 @@ export class AuthService {
                 _id: user._id,
                 profile_id: user.profile_id,
                 globalUserId: user._id,
+                organization: user.organization,
                 profile: user.profile,
                 role: user.role,
                 department: user.department,
@@ -76,21 +77,23 @@ export class AuthService {
         // Find by profile.email
         const user = await User.findOne({ 'profile.email': email }).select('+password');
         if (!user || !user.password) {
-            throw new AppError('Invalid credentials', 401);
+            throw new AppError('Invalid credentials', user, 401);
         }
 
         const isMatch = await comparePassword(password, user.password);
         if (!isMatch) {
-            throw new AppError('Invalid credentials', 401);
+            throw new AppError('Invalid credentials', user, 401);
         }
 
         const token = signToken(user._id, user.role);
 
         const userObj = user.toObject();
         delete userObj.password;
-        
+
         let permissions = user.permissions || [];
         // Auto-grant administrative permissions to admins
+        console.log(user);
+
         if (user.role === 'admin') {
             const adminPerms = ['manage_users', 'manage_teams', 'show_user_phone_number', 'view_lead_phone'];
             permissions = [...new Set([...permissions, ...adminPerms])];
@@ -149,17 +152,17 @@ export class AuthService {
                 if (team && team.allowed_projects && team.allowed_projects.length > 0) {
                     // Create a Map with project_id as key to avoid duplicates
                     const projectMap = new Map();
-                    
+
                     // Add user's existing projects
                     allowed_projects.forEach(p => projectMap.set(p.project_id, p));
-                    
+
                     // Merge team projects
                     team.allowed_projects.forEach(p => {
                         if (!projectMap.has(p.project_id)) {
                             projectMap.set(p.project_id, p);
                         }
                     });
-                    
+
                     allowed_projects = Array.from(projectMap.values());
                 }
             } catch (err) {

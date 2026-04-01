@@ -34,7 +34,12 @@ export const protect = async (req, res, next) => {
 
 export const authorize = (...roles) => {
     return (req, res, next) => {
-        if (!req.user || !roles.includes(req.user.role)) {
+        // Admins bypass role restrictions
+        if (req.user && req.user.role === 'admin') {
+            return next();
+        }
+
+        if (!req.user || !roles.includes(req.user.role) ) {
             return next(
                 new AppError(`User role ${req.user?.role} is not authorized to access this route`, 403)
             );
@@ -45,6 +50,11 @@ export const authorize = (...roles) => {
 
 export const authorizePermission = (permission) => {
     return (req, res, next) => {
+        // Admins bypass permission restrictions
+        if (req.user && req.user.role === 'admin') {
+            return next();
+        }
+
         const hasPermission = req.user && req.user.permissions && req.user.permissions.includes(permission);
 
         if (!hasPermission) {

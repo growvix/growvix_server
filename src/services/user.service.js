@@ -5,13 +5,13 @@ import { AppError } from '../utils/apiResponse.util.js';
 import { hashPassword } from '../utils/security.util.js';
 
 export class UserService {
-    async getUserById(id, requesterPermissions = []) {
+    async getUserById(id, requester = { permissions: [], role: '' }) {
         const user = await User.findById(id).lean();
         if (!user) {
             throw new AppError('User not found', 404);
         }
 
-        const canShowPhone = requesterPermissions.includes('show_user_phone_number');
+        const canShowPhone = (requester.permissions || []).includes('show_user_phone_number') || requester.role === 'admin';
         if (!canShowPhone && user.profile?.phone && user.profile.phone !== "-") {
             user.profile.phone = this._maskPhoneNumber(user.profile.phone);
         }
@@ -48,10 +48,15 @@ export class UserService {
             throw new AppError('Email already in use', 400);
         }
 
+        // Calculate the next sequential profile_id
+        const lastUser = await User.findOne().sort({ profile_id: -1 }).select('profile_id');
+        const nextProfileId = lastUser?.profile_id ? lastUser.profile_id + 1 : 1;
+
         const hashedPassword = await hashPassword(password);
 
         // Step 1: Create user in global admin database
         const newUser = await User.create({
+            profile_id: nextProfileId,
             organization,
             profile: {
                 firstName,
@@ -60,7 +65,8 @@ export class UserService {
                 phone
             },
             password: hashedPassword,
-            role
+            role,
+            isActive: true
         });
 
         // Step 2: Store a copy in organization-specific database
@@ -73,14 +79,16 @@ export class UserService {
 
             const createdClientUser = await ClientUser.create({
                 _id: newUser._id,
+                profile_id: newUser.profile_id,
                 globalUserId: newUser._id,
+                organization: newUser.organization,
                 profile: {
                     firstName,
                     lastName,
                     email,
                     phone
                 },
-                role,
+                role: newUser.role,
                 isActive: true
             });
 
@@ -100,7 +108,7 @@ export class UserService {
      * Get all users from global database
      * Optionally filter by organization
      */
-    async getAllUsers({ limit = 10, page = 1, organization = null } = {}) {
+    async getAllUsers({ limit = 10, page = 1, organization = null, requester = { permissions: [], role: '' } } = {}) {
         const safeLimit = Math.max(1, parseInt(limit, 10));
         const safePage = Math.max(1, parseInt(page, 10));
         const skip = (safePage - 1) * safeLimit;
@@ -116,7 +124,7 @@ export class UserService {
             User.countDocuments(query)
         ]);
 
-        const canShowPhone = (arguments[0].requesterPermissions || []).includes('show_user_phone_number');
+        const canShowPhone = (requester.permissions || []).includes('show_user_phone_number') || requester.role === 'admin';
         if (!canShowPhone) {
             users.forEach(u => {
                 if (u.profile?.phone && u.profile.phone !== "-") {
@@ -138,7 +146,7 @@ export class UserService {
     /**
      * Get users from a specific organization's database
      */
-    async getOrganizationUsers(organization, limit = 10, page = 1, requesterPermissions = []) {
+    async getOrganizationUsers(organization, limit = 10, page = 1, requester = { permissions: [], role: '' }) {
         const skip = (page - 1) * limit;
 
         const orgConnection = await getOrganizationConnection(organization);
@@ -147,7 +155,7 @@ export class UserService {
         const users = await ClientUser.find({ isActive: true }).skip(skip).limit(limit).lean();
         const total = await ClientUser.countDocuments({ isActive: true });
 
-        const canShowPhone = requesterPermissions.includes('show_user_phone_number');
+        const canShowPhone = (requester.permissions || []).includes('show_user_phone_number') || requester.role === 'admin';
         if (!canShowPhone) {
             users.forEach(u => {
                 if (u.profile?.phone && u.profile.phone !== "-") {

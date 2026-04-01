@@ -55,7 +55,7 @@ export class ProjectController {
     getProjectBookedUnits = asyncHandler(async (req, res) => {
         const organization = req.query.organization;
         const { id } = req.params;
-        const bookedUnits = await projectService.getProjectBookedUnits(organization, id);
+        const bookedUnits = await projectService.getProjectBookedUnits(organization, id, req.user);
         res.status(200).json(ApiResponse.success('Project booked units fetched successfully', bookedUnits));
     });
 
@@ -71,7 +71,7 @@ export class ProjectController {
             projectId: req.query.projectId
         };
 
-        const bookedUnits = await projectService.getAllBookedUnits(organization, filters);
+        const bookedUnits = await projectService.getAllBookedUnits(organization, filters, req.user);
         res.status(200).json(ApiResponse.success('All booked units fetched successfully', bookedUnits));
     });
 }

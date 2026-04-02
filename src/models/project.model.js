@@ -27,7 +27,8 @@ const UnitSchema = new Schema({
         userId: { type: String },    // Added: Who booked it
         userName: { type: String },  // Added: Name of user who booked it
         bookedAt: { type: Date }     // Added: Timestamp of booking
-    }
+    },
+    unitPlanImages: [{ type: String }] // Added: Up to 5 image URLs per unit
 }, { _id: false });
 
 // Floor Schema - Contains units

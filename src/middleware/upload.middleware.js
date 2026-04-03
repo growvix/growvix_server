@@ -41,13 +41,18 @@ const profilePictureStorage = multer.diskStorage({
     }
 });
 
-// File filter - only accept images
+// File filter - accept images and PDFs/Docs
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedTypes = [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 
+        'application/pdf', 
+        'application/msword', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
     if (allowedTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'), false);
+        cb(new Error('Only image, SVG, PDF, and DOC files are allowed'), false);
     }
 };
 

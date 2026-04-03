@@ -10,5 +10,7 @@ const router = Router();
 
 router.get('/', campaignController.getAllCampaigns);
 router.post('/', campaignController.createCampaign);
+router.put('/:id', campaignController.updateCampaign);
+router.delete('/:id', campaignController.deleteCampaign);
 
 export default router;

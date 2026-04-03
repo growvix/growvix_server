@@ -12,6 +12,7 @@ export class UserController {
     // Get user by ID (Admin or public?)
     getUser = asyncHandler(async (req, res) => {
         const user = await userService.getUserById(req.params.id, req.user);
+
         res.status(200).json(ApiResponse.success('User retrieved', user));
     });
 
@@ -39,6 +40,7 @@ export class UserController {
 
     // Create user
     createUser = asyncHandler(async (req, res) => {
+
         // Assign new user to the same organization as the creating user (admin)
         const userData = { ...req.body, organization: req.user?.organization };
         const user = await userService.createUser(userData);
@@ -46,16 +48,93 @@ export class UserController {
     });
 
     // Update user
-    updateUser = asyncHandler(async (req, res) => {
-        const user = await userService.updateUser(req.params.id, req.body);
-        res.status(200).json(ApiResponse.success('User updated', user));
-    });
+  updateUser = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
+    const targetUserId = req.params.id;
+
+    const targetUser = await userService.getUserById(targetUserId);
+
+    if (!targetUser) {
+        return res.status(404).json(ApiResponse.error("User not found"));
+    }
+
+    // 🚫 USER cannot edit anyone
+    if (currentUser.role === "user") {
+        return res.status(403).json(
+            ApiResponse.error("You are not allowed to edit users")
+        );
+    }
+
+    // 🚫 MANAGER rules
+    if (currentUser.role === "manager") {
+
+        // ❌ cannot edit admin
+        if (targetUser.role === "admin") {
+            return res.status(403).json(
+                ApiResponse.error("You cannot edit an admin")
+            );
+        }
+
+        // ❌ cannot edit another manager
+        if (targetUser.role === "manager") {
+            return res.status(403).json(
+                ApiResponse.error("You cannot edit another manager")
+            );
+        }
+    }
+
+    // 🚫 Prevent non-admin promoting to admin
+    if (
+        currentUser.role !== "admin" &&
+        req.body.role === "admin"
+    ) {
+        return res.status(403).json(
+            ApiResponse.error("You cannot promote a user to admin")
+        );
+    }
+
+    // 🚫 Prevent non-admin assigning admin permissions
+    if (
+        currentUser.role !== "admin" &&
+        req.body.permissions?.includes("manage_users")
+    ) {
+        return res.status(403).json(
+            ApiResponse.error("You cannot assign admin-level permissions")
+        );
+    }
+
+    // ✅ Allowed → update
+
+    const updatedUser = await userService.updateUser(targetUserId, req.body);
+
+    res.status(200).json(ApiResponse.success("User updated", updatedUser));
+});
 
     // Delete user
-    deleteUser = asyncHandler(async (req, res) => {
-        await userService.deleteUser(req.params.id);
-        res.status(200).json(ApiResponse.success('User deleted'));
-    });
+   deleteUser = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
+    const targetUser = await userService.getUserById(req.params.id);
+
+    if (!targetUser) {
+        return res.status(404).json(ApiResponse.error("User not found"));
+    }
+
+    // ❌ user cannot delete anyone
+    if (currentUser.role === "user") {
+        return res.status(403).json(ApiResponse.error("Not allowed"));
+    }
+
+    // ❌ manager restrictions
+    if (currentUser.role === "manager") {
+        if (targetUser.role === "admin" || targetUser.role === "manager") {
+            return res.status(403).json(ApiResponse.error("Not allowed"));
+        }
+    }
+
+    await userService.deleteUser(req.params.id);
+
+    res.status(200).json(ApiResponse.success("User deleted"));
+});
 }
 
 export const userController = new UserController();

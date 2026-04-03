@@ -22,10 +22,13 @@ const CampaignSchema = new Schema(
                 medium: { type: String },
                 campaignType: { type: String },
                 integrationType: { type: String },
-                redirectionUrl: { type: String }
+                redirectionUrl: { type: String },
+                projectId: { type: String },
+                projectName: { type: String }
             }
         ],
         organization: { type: String, required: true, index: true },
+        status: { type: Boolean, default: true },
     },
     {
         timestamps: true,

@@ -25,6 +25,7 @@ export class AuthController {
             email: result.email,
             token: result.token,
             role: result.role,
+            profileImagePath: result.profileImagePath || '',
             permissions: result.permissions || []
         };
 
@@ -44,6 +45,7 @@ export class AuthController {
             email: result.email,
             token: result.token,
             role: result.role,
+            profileImagePath: result.profileImagePath || '',
             permissions: result.permissions || [],
             allowed_projects: result.allowed_projects || []
         };

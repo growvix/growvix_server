@@ -4,6 +4,7 @@ import { body, validationResult } from 'express-validator';
 import { protect, authorizePermission } from '../middleware/auth.middleware.js';
 
 const router = Router();
+router.use(protect);
 
 // Validation middleware for adding project
 const validateProject = [

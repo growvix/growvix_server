@@ -1,5 +1,6 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadModel } from '../models/lead.model.js';
+import { getClientUserModel } from '../models/clientUser.model.js';
 import { getBulkUploadModel } from '../models/bulkUpload.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import mongoose from 'mongoose';
@@ -7,6 +8,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { roundRobinService } from './roundRobin.service.js';
 
 export class LeadService {
+    _maskPhoneNumber(phone) {
+        if (!phone || phone === "-" || phone.length <= 2) return phone;
+        if (phone.startsWith('***')) return phone; // Already masked
+        return `********${phone.slice(-2)}`;
+    }
+
     async addLead(data) {
         // ... (existing addLead remains unchanged above) ...
         const organization = data.organization;
@@ -219,7 +226,7 @@ export class LeadService {
         }
     }
 
-    async getAllLeads(organization, filters = {}, { offset = 0, limit = 30 } = {}) {
+    async getAllLeads(organization, filters = {}, { offset = 0, limit = 30, user = null } = {}) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -272,6 +279,24 @@ export class LeadService {
                 Lead.find(query).sort({ profile_id: -1 }).skip(safeOffset).limit(safeLimit).lean(),
             ]);
 
+            const role = user?.role?.toLowerCase();
+            const canShowAllPhones = role === 'admin' || role === 'manager';
+            
+            console.error(`[LeadService DEBUG] user_email=${user?.email || user?.profile?.email}, role=${role}, canShowAllPhones=${canShowAllPhones}`);
+
+            let orgUserId = null;
+            if (user && !canShowAllPhones) {
+                const email = user.email || user.profile?.email;
+                if (email) {
+                    const ClientUser = getClientUserModel(orgConn);
+                    const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
+                    orgUserId = orgUser?._id?.toString();
+                    console.error(`[LeadService DEBUG] user email from context: ${email}, Resolved orgUserId: ${orgUserId}`);
+                } else {
+                    console.error(`[LeadService DEBUG] User object present but no email found:`, JSON.stringify(user));
+                }
+            }
+
             const mappedLeads = leads.map(lead => {
                 const receivedValue = lead.acquired?.[0]?.received;
                 let receivedStr = '';
@@ -280,11 +305,30 @@ export class LeadService {
                     receivedStr = !isNaN(date.getTime()) ? date.toISOString() : String(receivedValue);
                 }
 
+                let phoneValue = lead.profile?.phone || '';
+                
+                // Final unmasking decision
+                let shouldShowFullPhone = false;
+                if (canShowAllPhones) {
+                    shouldShowFullPhone = true;
+                } else if (orgUserId && lead.exe_user && lead.exe_user.toString() === orgUserId) {
+                    shouldShowFullPhone = true;
+                }
+
+                if (lead.profile_id === 10 || lead.profile_id === 9) {
+                    console.error(`[LeadService DEBUG] Lead #${lead.profile_id}: shouldShowFullPhone=${shouldShowFullPhone}, canShowAllPhones=${canShowAllPhones}, orgUserId=${orgUserId}, lead.exe_user=${lead.exe_user}`);
+                }
+
+                let finalPhone = phoneValue;
+                if (!shouldShowFullPhone && phoneValue && phoneValue !== "-") {
+                    finalPhone = this._maskPhoneNumber(phoneValue);
+                }
+
                 return {
                     lead_id: lead._id.toString(),
                     profile_id: lead.profile_id,
                     name: lead.profile?.name || '',
-                    phone: lead.profile?.phone || '',
+                    phone: finalPhone,
                     stage: lead.stage || '',
                     status: lead.status === 'Untouched' ? 'No Activity' : (lead.status || ''),
                     campaign: lead.acquired?.[0]?.campaign || '',
@@ -301,7 +345,7 @@ export class LeadService {
         }
     }
 
-    async getLeadById(organization, id) {
+    async getLeadById(organization, id, user = null) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -344,11 +388,47 @@ export class LeadService {
                 }));
             };
 
+            const role = user?.role?.toLowerCase();
+            const canShowAllPhones = role === 'admin' || role === 'manager';
+            
+            let isAssignedToMe = false;
+            if (user && !canShowAllPhones && lead.exe_user) {
+                const email = user.email || user.profile?.email;
+                if (email) {
+                    const ClientUser = getClientUserModel(orgConn);
+                    const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
+                    if (orgUser && orgUser._id.toString() === lead.exe_user.toString()) {
+                        isAssignedToMe = true;
+                    }
+                }
+            }
+
+            let phone = lead.profile?.phone || '';
+            if (phone && phone !== "-" && !canShowAllPhones && !isAssignedToMe) {
+                phone = this._maskPhoneNumber(phone);
+            }
+
+            let exe_user_name = '';
+            if (lead.exe_user) {
+                const ClientUser = getClientUserModel(orgConn);
+                const exeUser = await ClientUser.findById(lead.exe_user).select('profile').lean();
+                if (exeUser) {
+                    exe_user_name = `${exeUser.profile?.firstName || ''} ${exeUser.profile?.lastName || ''}`.trim() || 'Unknown';
+                }
+            }
+
+            // Fetch activities for this lead
+            const { leadActivityService } = await import('./leadActivity.service.js');
+            const activities = await leadActivityService.getActivitiesByLeadId(organization, lead._id.toString());
+
+            // Count completed site visits
+            const site_visits_completed = activities.filter(a => a.updates === 'site_visit' && a.site_visit_completed).length;
+
             return {
                 _id: lead._id.toString(),
                 profile_id: lead.profile_id,
                 organization: lead.organization,
-                profile: lead.profile || null,
+                profile: lead.profile ? { ...lead.profile, phone } : null,
                 stage: lead.stage,
                 status: lead.status === 'Untouched' ? 'No Activity' : lead.status,
                 prefered: lead.prefered || null,
@@ -380,6 +460,9 @@ export class LeadService {
                     value: r.value,
                 })),
                 exe_user: lead.exe_user ? lead.exe_user.toString() : '',
+                exe_user_name,
+                activities,
+                site_visits_completed,
                 createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',
                 updatedAt: lead.updatedAt ? new Date(lead.updatedAt).toISOString() : '',
                 important_activities: (lead.important_activities || []).map(ia => ({
@@ -393,7 +476,7 @@ export class LeadService {
         }
     }
 
-    async updateLead(organization, id, updateData) {
+    async updateLead(organization, id, updateData, user = null) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
@@ -425,7 +508,7 @@ export class LeadService {
 
             // Return the full LeadDetail object via getLeadById
             // This ensures all fields match the LeadDetail GraphQL type
-            return await this.getLeadById(organization, id);
+            return await this.getLeadById(organization, id, user);
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to update lead: ' + err.message, 500);

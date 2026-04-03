@@ -59,7 +59,8 @@ export class UserController {
     }
 
     // 🚫 USER cannot edit anyone
-    if (currentUser.role === "user") {
+    // 🚫 USER cannot edit anyone EXCEPT themselves
+    if (currentUser.role === "user" && currentUser._id.toString() !== targetUserId) {
         return res.status(403).json(
             ApiResponse.error("You are not allowed to edit users")
         );

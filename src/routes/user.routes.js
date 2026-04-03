@@ -84,7 +84,7 @@ router.get('/:id', authorizePermission('view_users'), userController.getUser);
  * @swagger
  * /api/users/{id}:
  *   put:
- *     summary: Update user (admin only)
+ *     summary: Update user (admin only or self)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -116,7 +116,7 @@ router.get('/:id', authorizePermission('view_users'), userController.getUser);
  *       200:
  *         description: User updated
  */
-router.put('/:id', authorizePermission('edit_users'), userController.updateUser);
+router.put('/:id', userController.updateUser);
 
 /**
  * @swagger

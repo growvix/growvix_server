@@ -19,6 +19,25 @@ export class CampaignController {
 
         res.status(200).json(ApiResponse.success('Campaigns fetched successfully', campaigns));
     });
+
+    updateCampaign = asyncHandler(async (req, res) => {
+        const { organization } = req.query;
+        const { id } = req.params;
+        const campaignData = req.body;
+
+        const campaign = await campaignService.updateCampaign(organization || req.user?.organization, id, campaignData);
+
+        res.status(200).json(ApiResponse.success('Campaign updated successfully', campaign));
+    });
+
+    deleteCampaign = asyncHandler(async (req, res) => {
+        const { organization } = req.query;
+        const { id } = req.params;
+
+        const result = await campaignService.deleteCampaign(organization || req.user?.organization, id);
+
+        res.status(200).json(ApiResponse.success('Campaign deleted successfully', result));
+    });
 }
 
 export const campaignController = new CampaignController();

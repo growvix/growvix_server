@@ -84,9 +84,22 @@ export class GoogleAdsIntegrationService {
             const integrations = await GoogleAdIntegration.find({ organization })
                 .populate('campaign_id', 'campaignName')
                 .populate('project_id', 'name product_id')
-                .sort({ createdAt: -1 });
+                .sort({ createdAt: -1 })
+                .lean();
 
-            return integrations;
+            // Fetch user names for created_by
+            const { User } = await import('../models/user.model.js');
+            const userIds = integrations.map(i => i.created_by).filter(Boolean);
+            const users = await User.find({ _id: { $in: userIds } }).select('profile.firstName profile.lastName');
+            const userMap = users.reduce((acc, user) => {
+                acc[user._id.toString()] = `${user.profile.firstName} ${user.profile.lastName || ''}`.trim();
+                return acc;
+            }, {});
+
+            return integrations.map(i => ({
+                ...i,
+                created_by_name: i.created_by ? userMap[i.created_by.toString()] : 'System'
+            }));
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to fetch integrations: ' + err.message, 500);

@@ -109,6 +109,7 @@ export class AuthService {
             firstName: user.profile.firstName,
             lastName: user.profile.lastName,
             email: user.profile.email,
+            profileImagePath: user.profile.profileImagePath || '',
             role: user.role,
             permissions: permissions
         };

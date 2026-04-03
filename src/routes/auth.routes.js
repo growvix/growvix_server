@@ -2,8 +2,29 @@ import { Router } from 'express';
 import { authController } from '../controllers/auth.controller.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { registerSchema, loginSchema, cploginSchema } from '../validations/auth.validation.js';
+import { getPublicKey, decryptPassword } from '../utils/encryption.util.js';
 
 const router = Router();
+
+// Public key endpoint - frontend fetches this to encrypt passwords
+router.get('/encryption-key', (req, res) => {
+    res.json({ success: true, data: { publicKey: getPublicKey() } });
+});
+
+// Middleware to decrypt encrypted passwords before processing
+const decryptPasswordMiddleware = (req, res, next) => {
+    try {
+        // Check if password looks like it's encrypted (base64 encoded RSA)
+        if (req.body.password && req.body.password.length > 100) {
+            req.body.password = decryptPassword(req.body.password);
+        }
+        next();
+    } catch (err) {
+        console.error("Decryption error:", err);
+        return res.status(400).json({ success: false, message: 'Invalid encrypted password', error: err.message });
+    }
+};
+
 
 /**
  * @swagger
@@ -28,7 +49,6 @@ const router = Router();
  *                 format: email
  *               password:
  *                 type: string
- *                 format: password
  *               organization:
  *                 type: string
  *               department:
@@ -40,7 +60,7 @@ const router = Router();
  *       400:
  *         description: Validation error
  */
-router.post('/register', validate(registerSchema), authController.register);
+router.post('/register', decryptPasswordMiddleware, validate(registerSchema), authController.register);
 
 /**
  * @swagger
@@ -96,7 +116,7 @@ router.post('/register', validate(registerSchema), authController.register);
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', validate(loginSchema), authController.login);
+router.post('/login', decryptPasswordMiddleware, validate(loginSchema), authController.login);
 
 /**
  * @swagger
@@ -151,6 +171,6 @@ router.post('/impersonate', protect, authorize('admin'), authController.imperson
  *       401:
  *         description: Invalid credentials
  */
-router.post('/Cplogin', validate(cploginSchema), authController.cplogin);
+router.post('/Cplogin', decryptPasswordMiddleware, validate(cploginSchema), authController.cplogin);
 
 export default router;

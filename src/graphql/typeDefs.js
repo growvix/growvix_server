@@ -129,6 +129,7 @@ export const typeDefs = `#graphql
         status: String
         exe_user: String
         exe_user_name: String
+        exe_user_image: String
         createdAt: String
         updatedAt: String
         site_visits_completed: Int
@@ -143,6 +144,7 @@ export const typeDefs = `#graphql
         lead_id: String!
         user_id: String!
         user_name: String
+        user_image: String
         updates: String
         stage: String
         site_visit_date: String
@@ -193,6 +195,7 @@ export const typeDefs = `#graphql
         lastName: String
         email: String
         phone: String
+        profileImagePath: String
     }
 
     type OrgUser {

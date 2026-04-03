@@ -409,11 +409,13 @@ export class LeadService {
             }
 
             let exe_user_name = '';
+            let exe_user_image = '';
             if (lead.exe_user) {
                 const ClientUser = getClientUserModel(orgConn);
                 const exeUser = await ClientUser.findById(lead.exe_user).select('profile').lean();
                 if (exeUser) {
                     exe_user_name = `${exeUser.profile?.firstName || ''} ${exeUser.profile?.lastName || ''}`.trim() || 'Unknown';
+                    exe_user_image = exeUser.profile?.profileImagePath || '';
                 }
             }
 
@@ -461,6 +463,7 @@ export class LeadService {
                 })),
                 exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                 exe_user_name,
+                exe_user_image,
                 activities,
                 site_visits_completed,
                 createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : '',

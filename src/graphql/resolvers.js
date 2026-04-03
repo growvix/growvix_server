@@ -1,4 +1,3 @@
-// GraphQL Resolvers
 import { leadService } from '../services/lead.service.js';
 import { leadActivityService } from '../services/leadActivity.service.js';
 import { projectService } from '../services/project.service.js';
@@ -6,6 +5,7 @@ import { userService } from '../services/user.service.js';
 import { leadStageService } from '../services/leadStage.service.js';
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getClientUserModel } from '../models/clientUser.model.js';
+import { User } from '../models/user.model.js';
 
 export const resolvers = {
     Query: {
@@ -38,10 +38,12 @@ export const resolvers = {
             return await leadService.getLeadById(organization, id, context.user);
         },
         getLeadActivities: async (_, { organization, leadId }) => {
-            return await leadActivityService.getActivitiesByLeadId(organization, leadId);
+            const activities = await leadActivityService.getActivitiesByLeadId(organization, leadId);
+            return activities.map(a => ({ ...a, organization }));
         },
         getLeadActivitiesByProfileId: async (_, { organization, profileId }) => {
-            return await leadActivityService.getActivitiesByProfileId(organization, profileId);
+            const activities = await leadActivityService.getActivitiesByProfileId(organization, profileId);
+            return activities.map(a => ({ ...a, organization }));
         },
         getSiteVisitActivities: async (_, { organization, startDate, endDate, userId, teamId, projectId }, context) => {
             return await leadActivityService.getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId }, context.user);
@@ -129,13 +131,15 @@ export const resolvers = {
     LeadDetail: {
         activities: async (parent, _, context) => {
             // parent contains the LeadDetail object with organization and profile_id
-            return await leadActivityService.getActivitiesByProfileId(parent.organization, parent.profile_id);
+            const activities = await leadActivityService.getActivitiesByProfileId(parent.organization, parent.profile_id);
+            return activities.map(a => ({ ...a, organization: parent.organization }));
         },
         site_visits_completed: async (parent) => {
             const activities = await leadActivityService.getActivitiesByProfileId(parent.organization, parent.profile_id);
             return activities.filter(a => a.updates === 'site_visit' && a.site_visit_completed).length;
         },
         exe_user_name: async (parent) => {
+            if (parent.exe_user_name) return parent.exe_user_name;
             if (!parent.exe_user || !parent.organization) return '';
             try {
                 const orgConn = await getOrganizationConnection(parent.organization);
@@ -146,6 +150,53 @@ export const resolvers = {
                 }
             } catch (err) {
                 console.error('Failed to resolve exe_user_name:', err.message);
+            }
+            return '';
+        },
+        exe_user_image: async (parent) => {
+            // Priority 1: Field already populated by service
+            if (parent.exe_user_image) return parent.exe_user_image;
+            if (!parent.exe_user || !parent.organization) return '';
+            
+            try {
+                // Priority 2: Look in Organization Database
+                const orgConn = await getOrganizationConnection(parent.organization);
+                const ClientUser = getClientUserModel(orgConn);
+                const user = await ClientUser.findById(parent.exe_user).select('profile').lean();
+                if (user?.profile?.profileImagePath) {
+                    return user.profile.profileImagePath;
+                }
+
+                // Priority 3: Fallback to Global Database
+                const globalUser = await User.findById(parent.exe_user).select('profile').lean();
+                if (globalUser?.profile?.profileImagePath) {
+                    return globalUser.profile.profileImagePath;
+                }
+            } catch (err) {
+                console.error('Failed to resolve exe_user_image:', err.message);
+            }
+            return '';
+        },
+    },
+    LeadActivity: {
+        user_image: async (parent) => {
+            if (parent.user_image) return parent.user_image;
+            if (!parent.user_id || !parent.organization) return '';
+            
+            try {
+                const orgConn = await getOrganizationConnection(parent.organization);
+                const ClientUser = getClientUserModel(orgConn);
+                const user = await ClientUser.findById(parent.user_id).select('profile').lean();
+                if (user?.profile?.profileImagePath) {
+                    return user.profile.profileImagePath;
+                }
+
+                const globalUser = await User.findById(parent.user_id).select('profile').lean();
+                if (globalUser?.profile?.profileImagePath) {
+                    return globalUser.profile.profileImagePath;
+                }
+            } catch (err) {
+                console.error('Failed to resolve user_image for activity:', err.message);
             }
             return '';
         },

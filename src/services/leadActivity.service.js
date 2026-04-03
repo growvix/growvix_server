@@ -180,32 +180,38 @@ export class LeadActivityService {
             const userMap = new Map();
             users.forEach(u => {
                 const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
-                if (u.profile_id) userMap.set(String(u.profile_id), name);
-                if (u._id) userMap.set(String(u._id), name);
-                if (u.globalUserId) userMap.set(String(u.globalUserId), name);
+                const image = u.profile?.profileImagePath || '';
+                const userData = { name, image };
+                if (u.profile_id) userMap.set(String(u.profile_id), userData);
+                if (u._id) userMap.set(String(u._id), userData);
+                if (u.globalUserId) userMap.set(String(u.globalUserId), userData);
             });
 
-            return activities.map(activity => ({
-                id: activity.id,
-                profile_id: activity.profile_id,
-                updates: activity.updates,
-                lead_id: activity.lead_id,
-                user_id: activity.user_id,
-                user_name: userMap.get(String(activity.user_id)) || 'Unknown',
-                stage: activity.stage,
-                status: activity.status,
-                notes: activity.notes,
-                follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
-                site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
-                site_visit_completed: activity.site_visit_completed || false,
-                site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
-                site_visit_completed_by: activity.site_visit_completed_by || null,
-                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by)) || 'Unknown') : null,
-                site_visit_project_id: activity.site_visit_project_id || null,
-                site_visit_project_name: activity.site_visit_project_name || null,
-                createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
-                updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
-            }));
+            return activities.map(activity => {
+                const userData = userMap.get(String(activity.user_id)) || { name: 'Unknown', image: '' };
+                return {
+                    id: activity.id,
+                    profile_id: activity.profile_id,
+                    updates: activity.updates,
+                    lead_id: activity.lead_id,
+                    user_id: activity.user_id,
+                    user_name: userData.name,
+                    user_image: userData.image,
+                    stage: activity.stage,
+                    status: activity.status,
+                    notes: activity.notes,
+                    follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
+                    site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                    site_visit_completed: activity.site_visit_completed || false,
+                    site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
+                    site_visit_completed_by: activity.site_visit_completed_by || null,
+                    site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by))?.name || 'Unknown') : null,
+                    site_visit_project_id: activity.site_visit_project_id || null,
+                    site_visit_project_name: activity.site_visit_project_name || null,
+                    createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
+                    updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
+                };
+            });
         } catch (err) {
             throw new AppError('Failed to fetch lead activities: ' + err.message, 500);
         }
@@ -263,33 +269,39 @@ export class LeadActivityService {
             const userMap = new Map();
             users.forEach(u => {
                 const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
-                if (u.profile_id) userMap.set(String(u.profile_id), name);
-                if (u._id) userMap.set(String(u._id), name);
-                if (u.globalUserId) userMap.set(String(u.globalUserId), name);
+                const image = u.profile?.profileImagePath || '';
+                const userData = { name, image };
+                if (u.profile_id) userMap.set(String(u.profile_id), userData);
+                if (u._id) userMap.set(String(u._id), userData);
+                if (u.globalUserId) userMap.set(String(u.globalUserId), userData);
             });
 
-            return activities.map(activity => ({
-                id: activity.id,
-                profile_id: activity.profile_id,
-                lead_id: activity.lead_id,
-                updates: activity.updates,
-                user_id: activity.user_id,
-                user_name: userMap.get(String(activity.user_id)) || 'Unknown',
-                stage: activity.stage,
-                reason: activity.reason,
-                status: activity.status,
-                notes: activity.notes,
-                follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
-                site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
-                site_visit_completed: activity.site_visit_completed || false,
-                site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
-                site_visit_completed_by: activity.site_visit_completed_by || null,
-                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by)) || 'Unknown') : null,
-                site_visit_project_id: activity.site_visit_project_id || null,
-                site_visit_project_name: activity.site_visit_project_name || null,
-                createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
-                updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
-            }));
+            return activities.map(activity => {
+                const userData = userMap.get(String(activity.user_id)) || { name: 'Unknown', image: '' };
+                return {
+                    id: activity.id,
+                    profile_id: activity.profile_id,
+                    lead_id: activity.lead_id,
+                    updates: activity.updates,
+                    user_id: activity.user_id,
+                    user_name: userData.name,
+                    user_image: userData.image,
+                    stage: activity.stage,
+                    reason: activity.reason,
+                    status: activity.status,
+                    notes: activity.notes,
+                    follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
+                    site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                    site_visit_completed: activity.site_visit_completed || false,
+                    site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
+                    site_visit_completed_by: activity.site_visit_completed_by || null,
+                    site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by))?.name || 'Unknown') : null,
+                    site_visit_project_id: activity.site_visit_project_id || null,
+                    site_visit_project_name: activity.site_visit_project_name || null,
+                    createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
+                    updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
+                };
+            });
         } catch (err) {
             throw new AppError('Failed to fetch lead activities: ' + err.message, 500);
         }

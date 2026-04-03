@@ -13,11 +13,13 @@ import googleWebhookRoutes from './googleWebhook.routes.js';
 import campaignRoutes from './campaign.routes.js';
 import sourceRoutes from './source.routes.js';
 import googleAdIntegrationRoutes from './googleAdIntegration.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
 
 
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/dashboard', dashboardRoutes);
 router.use('/users', userRoutes);
 router.use('/leads', leadRoutes);
 router.use('/projects', projectRoutes);

@@ -8,14 +8,14 @@ import { getClientUserModel } from '../models/clientUser.model.js';
  * @param {Object} req - Request object containing organization, filters, offset, limit
  * @returns {Object} Response with leads array and total count
  */
-export async function getAllLeads(req) {
+export async function getAllLeads(req, user) {
     const { organization, filters, offset = 0, limit = 30 } = req;
 
     if (!organization) {
         throw new Error('Organization is required');
     }
 
-    const result = await leadService.getAllLeads(organization, filters || {}, { offset, limit });
+    const result = await leadService.getAllLeads(organization, filters || {}, { offset, limit, user });
     const { leads, total } = result;
 
     // Batch-resolve exe_user_name

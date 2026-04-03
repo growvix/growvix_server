@@ -9,8 +9,8 @@ import { getClientUserModel } from '../models/clientUser.model.js';
 
 export const resolvers = {
     Query: {
-        getAllLeads: async (_, { organization }) => {
-            const result = await leadService.getAllLeads(organization);
+        getAllLeads: async (_, { organization }, context) => {
+            const result = await leadService.getAllLeads(organization, {}, { user: context.user });
             const leads = result.leads || [];
             // Resolve exe_user_name for each lead
             if (leads.length > 0) {
@@ -34,8 +34,8 @@ export const resolvers = {
             }
             return leads;
         },
-        getLeadById: async (_, { organization, id }) => {
-            return await leadService.getLeadById(organization, id);
+        getLeadById: async (_, { organization, id }, context) => {
+            return await leadService.getLeadById(organization, id, context.user);
         },
         getLeadActivities: async (_, { organization, leadId }) => {
             return await leadActivityService.getActivitiesByLeadId(organization, leadId);
@@ -43,8 +43,8 @@ export const resolvers = {
         getLeadActivitiesByProfileId: async (_, { organization, profileId }) => {
             return await leadActivityService.getActivitiesByProfileId(organization, profileId);
         },
-        getSiteVisitActivities: async (_, { organization, startDate, endDate, userId, teamId, projectId }) => {
-            return await leadActivityService.getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId });
+        getSiteVisitActivities: async (_, { organization, startDate, endDate, userId, teamId, projectId }, context) => {
+            return await leadActivityService.getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId }, context.user);
         },
         getAllProjects: async (_, { organization }) => {
             const projects = await projectService.getAllProjects(organization);
@@ -100,8 +100,8 @@ export const resolvers = {
         createLeadActivity: async (_, { organization, input }) => {
             return await leadActivityService.createActivity(organization, input);
         },
-        updateLead: async (_, { organization, id, input }) => {
-            return await leadService.updateLead(organization, id, input);
+        updateLead: async (_, { organization, id, input }, context) => {
+            return await leadService.updateLead(organization, id, input, context.user);
         },
         markSiteVisitCompleted: async (_, { organization, activityId, userId }) => {
             return await leadActivityService.markSiteVisitCompleted(organization, activityId, userId);

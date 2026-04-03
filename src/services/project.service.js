@@ -77,9 +77,9 @@ export class ProjectService {
             const orgConn = await getOrganizationConnection(organization);
             const Project = getProjectModel(orgConn);
 
-            // Check for duplicate project name (case-insensitive, space-normalized)
+            // Check for duplicate project name (case-insensitive, space-normalized) ignoring inactive projects
             const normalizedName = data.name.trim().replace(/\s+/g, ' ').toLowerCase();
-            const existingProjects = await Project.find().select('name');
+            const existingProjects = await Project.find({ status: { $ne: 'inactive' } }).select('name');
             const duplicate = existingProjects.find(p => {
                 const existingNormalized = p.name.trim().replace(/\s+/g, ' ').toLowerCase();
                 return existingNormalized === normalizedName;
@@ -113,6 +113,9 @@ export class ProjectService {
 
             // Use aggregation for faster performance with large datasets
             const projects = await Project.aggregate([
+                {
+                    $match: { status: { $ne: 'inactive' } }
+                },
                 {
                     $project: {
                         product_id: 1,
@@ -340,6 +343,23 @@ export class ProjectService {
         try {
             const orgConn = await getOrganizationConnection(organization);
             const Project = getProjectModel(orgConn);
+
+            if (updateData.name) {
+                const normalizedName = updateData.name.trim().replace(/\s+/g, ' ').toLowerCase();
+                const existingProjects = await Project.find({ 
+                    status: { $ne: 'inactive' },
+                    product_id: { $ne: parseInt(productId) }
+                }).select('name');
+                
+                const duplicate = existingProjects.find(p => {
+                    const existingNormalized = p.name.trim().replace(/\s+/g, ' ').toLowerCase();
+                    return existingNormalized === normalizedName;
+                });
+                
+                if (duplicate) {
+                    throw new AppError(`Project name "${updateData.name}" already exists (names are case-insensitive)`, 400);
+                }
+            }
 
             const project = await Project.findOneAndUpdate(
                 { product_id: parseInt(productId) },

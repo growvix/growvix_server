@@ -99,6 +99,7 @@ const ProjectSchema = new Schema(
         plots: [PlotSchema],
         plotNumberPattern: { type: String, enum: ['numeric', 'alpha', 'custom'], default: 'numeric' },
         layoutImages: [{ type: String }], // Site layout images for plots
+        status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     },
     {
         timestamps: true,

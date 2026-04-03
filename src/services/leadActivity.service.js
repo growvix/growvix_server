@@ -335,7 +335,7 @@ export class LeadActivityService {
      * @param {object} filters - { startDate, endDate, userId, teamId }
      * @returns {array} List of site visit calendar entries
      */
-    async getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId } = {}) {
+    async getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId } = {}, user = null) {
         if (!organization) throw new AppError('Organization is required', 400);
 
         try {
@@ -344,18 +344,41 @@ export class LeadActivityService {
             const Lead = getLeadModel(orgConn);
             const ClientUser = getClientUserModel(orgConn);
 
+            // Role-based filtering
+            const role = user?.role?.toLowerCase();
+            const isAdmin = role === 'admin' || role === 'manager';
+            let effectiveUserId = userId;
+
+            // If not admin/manager, always force to current user
+            if (!isAdmin && user?._id) {
+                effectiveUserId = user._id;
+            }
+
             // Base filter: only site_visit activities that have a date
             const filter = { updates: 'site_visit', site_visit_date: { $ne: null } };
 
-            // Date range filter
+            // Task 1: end with today logic.
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
+
             if (startDate || endDate) {
-                filter.site_visit_date = filter.site_visit_date || {};
-                if (startDate) filter.site_visit_date.$gte = new Date(startDate);
-                if (endDate) filter.site_visit_date.$lte = new Date(endDate);
+                filter.site_visit_date = { $ne: null }; // Reset to ensure we can add $gte/$lte
+                if (startDate) {
+                    filter.site_visit_date = { ...filter.site_visit_date, $gte: new Date(startDate) };
+                }
+                
+                let effectiveEnd = endDate ? new Date(endDate) : today;
+                // Cap at today if it's a general filter request
+                if (effectiveEnd > today) effectiveEnd = today;
+                
+                filter.site_visit_date = { ...filter.site_visit_date, $lte: effectiveEnd };
+            } else {
+                // Default: everything up to today
+                filter.site_visit_date = { $ne: null, $lte: today };
             }
 
             // Team filter: resolve team members, then filter by user_id
-            if (teamId) {
+            if (teamId && isAdmin) { // Only admins can filter by team
                 const { getClientTeamModel } = await import('../models/team.model.js');
                 const Team = getClientTeamModel(orgConn);
                 const team = await Team.findById(teamId).lean();
@@ -370,8 +393,8 @@ export class LeadActivityService {
             }
 
             // Individual user filter (overrides team filter for user_id)
-            if (userId) {
-                filter.user_id = userId;
+            if (effectiveUserId) {
+                filter.user_id = effectiveUserId;
             }
 
             // Project filter

@@ -61,6 +61,12 @@ const LeadSchema = new Schema(
     }
 );
 
+// Performance Indexes
+LeadSchema.index({ organization: 1, exe_user: 1, status: 1 });
+LeadSchema.index({ organization: 1, profile_id: -1 });
+LeadSchema.index({ organization: 1, 'profile.name': 1 });
+LeadSchema.index({ organization: 1, 'acquired.source': 1 });
+
 export const getLeadModel = (connection) => {
     if (connection.models.Lead) {
         return connection.models.Lead;

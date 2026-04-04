@@ -154,21 +154,23 @@ export const resolvers = {
             return '';
         },
         exe_user_image: async (parent) => {
-            // Priority 1: Field already populated by service
-            if (parent.exe_user_image) return parent.exe_user_image;
+            // Priority 1: Field already populated by service (should be a non-empty string)
+            if (parent.exe_user_image && typeof parent.exe_user_image === 'string' && parent.exe_user_image.length > 0) {
+                return parent.exe_user_image;
+            }
             if (!parent.exe_user || !parent.organization) return '';
             
             try {
                 // Priority 2: Look in Organization Database
                 const orgConn = await getOrganizationConnection(parent.organization);
                 const ClientUser = getClientUserModel(orgConn);
-                const user = await ClientUser.findById(parent.exe_user).select('profile').lean();
+                const user = await ClientUser.findOne({ _id: parent.exe_user }).select('profile').lean();
                 if (user?.profile?.profileImagePath) {
                     return user.profile.profileImagePath;
                 }
 
                 // Priority 3: Fallback to Global Database
-                const globalUser = await User.findById(parent.exe_user).select('profile').lean();
+                const globalUser = await User.findOne({ _id: parent.exe_user }).select('profile').lean();
                 if (globalUser?.profile?.profileImagePath) {
                     return globalUser.profile.profileImagePath;
                 }
@@ -180,18 +182,20 @@ export const resolvers = {
     },
     LeadActivity: {
         user_image: async (parent) => {
-            if (parent.user_image) return parent.user_image;
+            if (parent.user_image && typeof parent.user_image === 'string' && parent.user_image.length > 0) {
+                return parent.user_image;
+            }
             if (!parent.user_id || !parent.organization) return '';
             
             try {
                 const orgConn = await getOrganizationConnection(parent.organization);
                 const ClientUser = getClientUserModel(orgConn);
-                const user = await ClientUser.findById(parent.user_id).select('profile').lean();
+                const user = await ClientUser.findOne({ _id: parent.user_id }).select('profile').lean();
                 if (user?.profile?.profileImagePath) {
                     return user.profile.profileImagePath;
                 }
 
-                const globalUser = await User.findById(parent.user_id).select('profile').lean();
+                const globalUser = await User.findOne({ _id: parent.user_id }).select('profile').lean();
                 if (globalUser?.profile?.profileImagePath) {
                     return globalUser.profile.profileImagePath;
                 }

@@ -19,8 +19,15 @@ export const protect = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, env.JWT_SECRET);
+        
+        let user = await User.findById(decoded.id);
+        
+        // If not found in User model, check GlobalCpUser model (for Channel Partners)
+        if (!user) {
+            const { GlobalCpUser } = await import('../models/cpUser.model.js');
+            user = await GlobalCpUser.findById(decoded.id);
+        }
 
-        const user = await User.findById(decoded.id);
         if (!user) {
             return next(new AppError('User not found with this token', 401));
         }

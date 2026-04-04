@@ -249,7 +249,17 @@ export class LeadService {
             if (filters.campaign) {
                 query['acquired.campaign'] = { $regex: filters.campaign, $options: 'i' };
             }
-            if (filters.status && filters.status !== 'undefined') {
+            if (filters.sub_source) {
+                query['acquired.sub_source'] = { $regex: filters.sub_source, $options: 'i' };
+            }
+            if (filters.project) {
+                // Support both legacy project array and new interested_projects structure
+                query.$or = [
+                    { project: { $regex: filters.project, $options: 'i' } },
+                    { 'interested_projects.project_name': { $regex: filters.project, $options: 'i' } }
+                ];
+            }
+            if (filters.status && filters.status !== 'undefined' && filters.status !== 'all') {
                 if (filters.status === 'No Activity') {
                     query['status'] = { $in: ['No Activity', 'Untouched'] };
                 } else {
@@ -259,7 +269,7 @@ export class LeadService {
             if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
                 query['exe_user'] = filters.assignedTo;
             }
-            if (filters.stage && filters.stage !== 'undefined') {
+            if (filters.stage && filters.stage !== 'undefined' && filters.stage !== 'all') {
                 query['stage'] = filters.stage;
             }
             if (filters.receivedOn && filters.receivedOn !== 'undefined') {
@@ -270,6 +280,23 @@ export class LeadService {
                     const endOfDay = new Date(date);
                     endOfDay.setHours(23, 59, 59, 999);
                     query['acquired.received'] = { $gte: startOfDay, $lte: endOfDay };
+                }
+            }
+            // Date range support for mobile
+            if ((filters.date_start || filters.date_end) && (!filters.receivedOn)) {
+                query['acquired.received'] = {};
+                if (filters.date_start) {
+                    const start = new Date(filters.date_start);
+                    start.setHours(0, 0, 0, 0);
+                    query['acquired.received'].$gte = start;
+                }
+                if (filters.date_end) {
+                    const end = new Date(filters.date_end);
+                    end.setHours(23, 59, 59, 999);
+                    query['acquired.received'].$lte = end;
+                }
+                if (Object.keys(query['acquired.received']).length === 0) {
+                    delete query['acquired.received'];
                 }
             }
 

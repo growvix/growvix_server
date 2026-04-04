@@ -188,17 +188,34 @@ export class AuthService {
         };
     }
 
-    async impersonate(adminUserId, targetUserId) {
-        // Verify the caller is an admin
-        const adminUser = await User.findById(adminUserId);
-        if (!adminUser || adminUser.role !== 'admin') {
-            throw new AppError('Only admins can impersonate other users', 403);
+    async impersonate(callerUserId, targetUserId) {
+        // Verify the caller exists and get their role
+        const callerUser = await User.findById(callerUserId);
+        if (!callerUser) {
+            throw new AppError('Caller not found', 404);
+        }
+
+        const callerRole = callerUser.role?.toLowerCase();
+        if (callerRole !== 'admin' && callerRole !== 'manager') {
+            throw new AppError('Only admins and managers can impersonate other users', 403);
         }
 
         // Find the target user
         const targetUser = await User.findById(targetUserId);
         if (!targetUser) {
             throw new AppError('Target user not found', 404);
+        }
+
+        // 🛡️ SECURITY CHECKS for Managers
+        if (callerRole === 'manager') {
+            // Check if target is in the same organization
+            if (String(targetUser.organization) !== String(callerUser.organization)) {
+                throw new AppError('You can only impersonate users within your own organization', 403);
+            }
+            // Check if target is a regular "user"
+            if (targetUser.role?.toLowerCase() !== 'user') {
+                throw new AppError('Managers are only permitted to impersonate accounts with the "user" role', 403);
+            }
         }
 
         const token = signToken(targetUser._id, targetUser.role);

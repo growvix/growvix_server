@@ -52,6 +52,17 @@ export class ProjectController {
         res.status(200).json(ApiResponse.success('Unit booked successfully', result));
     });
 
+    reverseBooking = asyncHandler(async (req, res) => {
+        const organization = req.body.organization;
+        const { id } = req.params;
+        const { blockId, unitId, plotId } = req.body;
+
+        const result = await projectService.reverseBooking(organization, id, {
+            blockId, unitId, plotId
+        });
+        res.status(200).json(ApiResponse.success('Booking reversed successfully', result));
+    });
+
     getProjectBookedUnits = asyncHandler(async (req, res) => {
         const organization = req.query.organization;
         const { id } = req.params;

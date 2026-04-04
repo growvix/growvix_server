@@ -362,6 +362,70 @@ export class ProjectService {
         }
     }
 
+    async reverseBooking(organization, productId, { blockId, unitId, plotId }) {
+        if (!organization) {
+            throw new AppError('Organization is required', 400);
+        }
+        if (!productId) {
+            throw new AppError('Project ID is required', 400);
+        }
+
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Project = getProjectModel(orgConn);
+            const project = await Project.findOne({ product_id: parseInt(productId) });
+
+            if (!project) {
+                throw new AppError('Project not found', 404);
+            }
+
+            // Plot unbooking
+            if (plotId) {
+                const plot = project.plots?.find(p => p.plotId === plotId);
+                if (!plot) {
+                    throw new AppError('Plot not found', 404);
+                }
+                plot.status = 'available';
+                plot.bookedBy = undefined;
+                project.markModified('plots');
+                await project.save();
+                return { type: 'plot', item: plot };
+            }
+
+            // Unit unbooking
+            if (blockId && unitId) {
+                const block = project.blocks?.find(b => b.blockId === blockId);
+                if (!block) {
+                    throw new AppError('Block not found', 404);
+                }
+
+                let targetUnit = null;
+                for (const floor of block.floors) {
+                    const unit = floor.units?.find(u => u.unitId === unitId);
+                    if (unit) {
+                        targetUnit = unit;
+                        break;
+                    }
+                }
+
+                if (!targetUnit) {
+                    throw new AppError('Unit not found', 404);
+                }
+
+                targetUnit.status = 'available';
+                targetUnit.bookedBy = undefined;
+                project.markModified('blocks');
+                await project.save();
+                return { type: 'unit', item: targetUnit };
+            }
+
+            throw new AppError('Either plotId or blockId+unitId must be provided', 400);
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to reverse booking: ' + err.message, 500);
+        }
+    }
+
     async updateProject(organization, productId, updateData) {
         if (!organization) {
             throw new AppError('Organization is required', 400);

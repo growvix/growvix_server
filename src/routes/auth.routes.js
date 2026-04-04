@@ -122,7 +122,7 @@ router.post('/login', decryptPasswordMiddleware, validate(loginSchema), authCont
  * @swagger
  * /api/auth/impersonate:
  *   post:
- *     summary: Impersonate user (Admin only)
+ *     summary: Impersonate user (Admin/Manager only)
  *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
@@ -143,7 +143,7 @@ router.post('/login', decryptPasswordMiddleware, validate(loginSchema), authCont
  *         description: Not authorized
  */
 import { protect, authorize } from '../middleware/auth.middleware.js';
-router.post('/impersonate', protect, authorize('admin'), authController.impersonate);
+router.post('/impersonate', protect, authorize('admin', 'manager'), authController.impersonate);
 
 /**
  * @swagger

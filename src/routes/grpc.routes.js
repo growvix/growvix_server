@@ -1,6 +1,7 @@
 // gRPC/Connect RPC routes for Lead service
 import { Router } from 'express';
 import { leadServiceHandlers } from '../grpc/lead.handlers.js';
+import { protect } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
@@ -61,9 +62,9 @@ const router = Router();
  *       400:
  *         description: Failed to fetch leads
  */
-router.post('/lead/GetAllLeads', async (req, res) => {
+router.post('/lead/GetAllLeads', protect, async (req, res) => {
     try {
-        const result = await leadServiceHandlers.getAllLeads(req.body);
+        const result = await leadServiceHandlers.getAllLeads(req.body, req.user);
         res.json(result);
     } catch (error) {
         console.error('gRPC GetAllLeads error:', error);

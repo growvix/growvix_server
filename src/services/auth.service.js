@@ -109,6 +109,7 @@ export class AuthService {
             firstName: user.profile.firstName,
             lastName: user.profile.lastName,
             email: user.profile.email,
+            profileImagePath: user.profile.profileImagePath || '',
             role: user.role,
             permissions: permissions
         };
@@ -180,6 +181,7 @@ export class AuthService {
             firstName: user.profile.firstName,
             lastName: user.profile.lastName,
             email: user.profile.email,
+            profileImagePath: user.profile.profileImagePath || '',
             role: role,
             permissions: permissions,
             allowed_projects: allowed_projects,
@@ -214,6 +216,7 @@ export class AuthService {
             firstName: targetUser.profile.firstName,
             lastName: targetUser.profile.lastName,
             email: targetUser.profile.email,
+            profileImagePath: targetUser.profile.profileImagePath || '',
             token,
             role: targetUser.role,
             permissions: permissions

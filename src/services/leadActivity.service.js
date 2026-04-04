@@ -6,6 +6,34 @@ import { AppError } from '../utils/apiResponse.util.js';
 
 export class LeadActivityService {
     /**
+     * Helper to resolve the local organization user IDs (UUID and profile_id)
+     * based on the global user's email or ID.
+     */
+    async _getEffectiveUserIds(orgConn, user) {
+        if (!user) return null;
+        const ClientUser = getClientUserModel(orgConn);
+        
+        // Find the user in the organization's database
+        const email = user.email || user.profile?.email;
+        const orgUser = await ClientUser.findOne({ 
+            $or: [
+                { globalUserId: user._id },
+                { profile_id: user.profile_id },
+                { "profile.email": email }
+            ] 
+        }).select('_id profile_id').lean();
+
+        if (!orgUser) return { ids: [user._id] };
+
+        const ids = [orgUser._id.toString(), String(orgUser.profile_id)];
+        // Add global ID as well just in case
+        if (user._id && !ids.includes(user._id.toString())) {
+            ids.push(user._id.toString());
+        }
+        return { ids };
+    }
+
+    /**
      * Create a new lead activity record and update lead's stage
      * @param {string} organization - Organization name for multi-tenant DB
      * @param {object} data - Activity data containing profile_id, lead_id, user_id, stage, status, notes
@@ -152,32 +180,38 @@ export class LeadActivityService {
             const userMap = new Map();
             users.forEach(u => {
                 const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
-                if (u.profile_id) userMap.set(String(u.profile_id), name);
-                if (u._id) userMap.set(String(u._id), name);
-                if (u.globalUserId) userMap.set(String(u.globalUserId), name);
+                const image = u.profile?.profileImagePath || '';
+                const userData = { name, image };
+                if (u.profile_id) userMap.set(String(u.profile_id), userData);
+                if (u._id) userMap.set(String(u._id), userData);
+                if (u.globalUserId) userMap.set(String(u.globalUserId), userData);
             });
 
-            return activities.map(activity => ({
-                id: activity.id,
-                profile_id: activity.profile_id,
-                updates: activity.updates,
-                lead_id: activity.lead_id,
-                user_id: activity.user_id,
-                user_name: userMap.get(String(activity.user_id)) || 'Unknown',
-                stage: activity.stage,
-                status: activity.status,
-                notes: activity.notes,
-                follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
-                site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
-                site_visit_completed: activity.site_visit_completed || false,
-                site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
-                site_visit_completed_by: activity.site_visit_completed_by || null,
-                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by)) || 'Unknown') : null,
-                site_visit_project_id: activity.site_visit_project_id || null,
-                site_visit_project_name: activity.site_visit_project_name || null,
-                createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
-                updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
-            }));
+            return activities.map(activity => {
+                const userData = userMap.get(String(activity.user_id)) || { name: 'Unknown', image: '' };
+                return {
+                    id: activity.id,
+                    profile_id: activity.profile_id,
+                    updates: activity.updates,
+                    lead_id: activity.lead_id,
+                    user_id: activity.user_id,
+                    user_name: userData.name,
+                    user_image: userData.image,
+                    stage: activity.stage,
+                    status: activity.status,
+                    notes: activity.notes,
+                    follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
+                    site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                    site_visit_completed: activity.site_visit_completed || false,
+                    site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
+                    site_visit_completed_by: activity.site_visit_completed_by || null,
+                    site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by))?.name || 'Unknown') : null,
+                    site_visit_project_id: activity.site_visit_project_id || null,
+                    site_visit_project_name: activity.site_visit_project_name || null,
+                    createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
+                    updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
+                };
+            });
         } catch (err) {
             throw new AppError('Failed to fetch lead activities: ' + err.message, 500);
         }
@@ -235,33 +269,39 @@ export class LeadActivityService {
             const userMap = new Map();
             users.forEach(u => {
                 const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
-                if (u.profile_id) userMap.set(String(u.profile_id), name);
-                if (u._id) userMap.set(String(u._id), name);
-                if (u.globalUserId) userMap.set(String(u.globalUserId), name);
+                const image = u.profile?.profileImagePath || '';
+                const userData = { name, image };
+                if (u.profile_id) userMap.set(String(u.profile_id), userData);
+                if (u._id) userMap.set(String(u._id), userData);
+                if (u.globalUserId) userMap.set(String(u.globalUserId), userData);
             });
 
-            return activities.map(activity => ({
-                id: activity.id,
-                profile_id: activity.profile_id,
-                lead_id: activity.lead_id,
-                updates: activity.updates,
-                user_id: activity.user_id,
-                user_name: userMap.get(String(activity.user_id)) || 'Unknown',
-                stage: activity.stage,
-                reason: activity.reason,
-                status: activity.status,
-                notes: activity.notes,
-                follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
-                site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
-                site_visit_completed: activity.site_visit_completed || false,
-                site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
-                site_visit_completed_by: activity.site_visit_completed_by || null,
-                site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by)) || 'Unknown') : null,
-                site_visit_project_id: activity.site_visit_project_id || null,
-                site_visit_project_name: activity.site_visit_project_name || null,
-                createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
-                updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
-            }));
+            return activities.map(activity => {
+                const userData = userMap.get(String(activity.user_id)) || { name: 'Unknown', image: '' };
+                return {
+                    id: activity.id,
+                    profile_id: activity.profile_id,
+                    lead_id: activity.lead_id,
+                    updates: activity.updates,
+                    user_id: activity.user_id,
+                    user_name: userData.name,
+                    user_image: userData.image,
+                    stage: activity.stage,
+                    reason: activity.reason,
+                    status: activity.status,
+                    notes: activity.notes,
+                    follow_up_date: activity.follow_up_date ? new Date(activity.follow_up_date).toISOString() : null,
+                    site_visit_date: activity.site_visit_date ? new Date(activity.site_visit_date).toISOString() : null,
+                    site_visit_completed: activity.site_visit_completed || false,
+                    site_visit_completed_at: activity.site_visit_completed_at ? new Date(activity.site_visit_completed_at).toISOString() : null,
+                    site_visit_completed_by: activity.site_visit_completed_by || null,
+                    site_visit_completed_by_name: activity.site_visit_completed_by ? (userMap.get(String(activity.site_visit_completed_by))?.name || 'Unknown') : null,
+                    site_visit_project_id: activity.site_visit_project_id || null,
+                    site_visit_project_name: activity.site_visit_project_name || null,
+                    createdAt: activity.createdAt ? new Date(activity.createdAt).toISOString() : '',
+                    updatedAt: activity.updatedAt ? new Date(activity.updatedAt).toISOString() : ''
+                };
+            });
         } catch (err) {
             throw new AppError('Failed to fetch lead activities: ' + err.message, 500);
         }
@@ -335,7 +375,7 @@ export class LeadActivityService {
      * @param {object} filters - { startDate, endDate, userId, teamId }
      * @returns {array} List of site visit calendar entries
      */
-    async getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId } = {}) {
+    async getSiteVisitsForCalendar(organization, { startDate, endDate, userId, teamId, projectId } = {}, user = null) {
         if (!organization) throw new AppError('Organization is required', 400);
 
         try {
@@ -344,18 +384,38 @@ export class LeadActivityService {
             const Lead = getLeadModel(orgConn);
             const ClientUser = getClientUserModel(orgConn);
 
+            // Role-based filtering
+            const role = user?.role?.toLowerCase();
+            const isAdmin = role === 'admin' || role === 'manager';
+            let effectiveUserFilter = null;
+            if (!isAdmin && user) {
+                effectiveUserFilter = await this._getEffectiveUserIds(orgConn, user);
+            } else if (userId) {
+                effectiveUserFilter = { ids: [userId] };
+            }
+
             // Base filter: only site_visit activities that have a date
             const filter = { updates: 'site_visit', site_visit_date: { $ne: null } };
 
-            // Date range filter
             if (startDate || endDate) {
-                filter.site_visit_date = filter.site_visit_date || {};
-                if (startDate) filter.site_visit_date.$gte = new Date(startDate);
-                if (endDate) filter.site_visit_date.$lte = new Date(endDate);
+                filter.site_visit_date = { $ne: null };
+                if (startDate) {
+                    filter.site_visit_date.$gte = new Date(startDate);
+                }
+                if (endDate) {
+                    const end = new Date(endDate);
+                    end.setHours(23, 59, 59, 999);
+                    filter.site_visit_date.$lte = end;
+                }
+            } else {
+                // Task 1: default view - we'll show everything for the calendar 
+                // but usually the frontend passes a date range if it wants something specific.
+                // Removing the mandatory today cap to allow future Scheduled visits.
+                filter.site_visit_date = { $ne: null };
             }
 
             // Team filter: resolve team members, then filter by user_id
-            if (teamId) {
+            if (teamId && isAdmin) { // Only admins can filter by team
                 const { getClientTeamModel } = await import('../models/team.model.js');
                 const Team = getClientTeamModel(orgConn);
                 const team = await Team.findById(teamId).lean();
@@ -370,8 +430,8 @@ export class LeadActivityService {
             }
 
             // Individual user filter (overrides team filter for user_id)
-            if (userId) {
-                filter.user_id = userId;
+            if (effectiveUserFilter) {
+                filter.user_id = { $in: effectiveUserFilter.ids };
             }
 
             // Project filter

@@ -1,9 +1,38 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getProjectModel } from '../models/project.model.js';
 import { getLeadModel } from '../models/lead.model.js';
+import { getClientUserModel } from '../models/clientUser.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 
 export class ProjectService {
+    /**
+     * Helper to resolve the local organization user IDs (UUID and profile_id)
+     * based on the global user's email or ID.
+     */
+    async _getEffectiveUserIds(orgConn, user) {
+        if (!user) return null;
+        const ClientUser = getClientUserModel(orgConn);
+        
+        // Find the user in the organization's database
+        const email = user.email || user.profile?.email;
+        const orgUser = await ClientUser.findOne({ 
+            $or: [
+                { globalUserId: user._id },
+                { profile_id: user.profile_id },
+                { "profile.email": email }
+            ] 
+        }).select('_id profile_id').lean();
+
+        if (!orgUser) return { ids: [user._id] };
+
+        const ids = [orgUser._id.toString(), String(orgUser.profile_id)];
+        // Add global ID as well just in case
+        if (user._id && !ids.includes(user._id.toString())) {
+            ids.push(user._id.toString());
+        }
+        return { ids };
+    }
+
     async addProject(data) {
         const organization = data.organization;
         if (!organization) {
@@ -77,9 +106,9 @@ export class ProjectService {
             const orgConn = await getOrganizationConnection(organization);
             const Project = getProjectModel(orgConn);
 
-            // Check for duplicate project name (case-insensitive, space-normalized)
+            // Check for duplicate project name (case-insensitive, space-normalized) ignoring inactive projects
             const normalizedName = data.name.trim().replace(/\s+/g, ' ').toLowerCase();
-            const existingProjects = await Project.find().select('name');
+            const existingProjects = await Project.find({ status: { $ne: 'inactive' } }).select('name');
             const duplicate = existingProjects.find(p => {
                 const existingNormalized = p.name.trim().replace(/\s+/g, ' ').toLowerCase();
                 return existingNormalized === normalizedName;
@@ -113,6 +142,9 @@ export class ProjectService {
 
             // Use aggregation for faster performance with large datasets
             const projects = await Project.aggregate([
+                {
+                    $match: { status: { $ne: 'inactive' } }
+                },
                 {
                     $project: {
                         product_id: 1,
@@ -341,6 +373,23 @@ export class ProjectService {
             const orgConn = await getOrganizationConnection(organization);
             const Project = getProjectModel(orgConn);
 
+            if (updateData.name) {
+                const normalizedName = updateData.name.trim().replace(/\s+/g, ' ').toLowerCase();
+                const existingProjects = await Project.find({ 
+                    status: { $ne: 'inactive' },
+                    product_id: { $ne: parseInt(productId) }
+                }).select('name');
+                
+                const duplicate = existingProjects.find(p => {
+                    const existingNormalized = p.name.trim().replace(/\s+/g, ' ').toLowerCase();
+                    return existingNormalized === normalizedName;
+                });
+                
+                if (duplicate) {
+                    throw new AppError(`Project name "${updateData.name}" already exists (names are case-insensitive)`, 400);
+                }
+            }
+
             const project = await Project.findOneAndUpdate(
                 { product_id: parseInt(productId) },
                 { $set: updateData },
@@ -458,14 +507,25 @@ export class ProjectService {
         }
     }
 
-    async getAllBookedUnits(organization, filters = {}, requester = { permissions: [], role: '' }) {
+    async getAllBookedUnits(organization, filters = {}, requester = null) {
         if (!organization) {
             throw new AppError('Organization is required', 400);
         }
-
+ 
         try {
             const orgConn = await getOrganizationConnection(organization);
             const Project = getProjectModel(orgConn);
+ 
+            // Role-based filtering
+            const role = requester?.role?.toLowerCase();
+            const isAdmin = role === 'admin' || role === 'manager';
+            let effectiveUserFilter = null;
+ 
+            if (!isAdmin && requester) {
+                effectiveUserFilter = await this._getEffectiveUserIds(orgConn, requester);
+            } else if (filters.userId) {
+                effectiveUserFilter = { ids: [String(filters.userId)] };
+            }
 
             const bookedItems = [];
 
@@ -486,7 +546,8 @@ export class ProjectService {
                                     new Date(plot.bookedBy.bookedAt) >= new Date(filters.startDate) &&
                                     new Date(plot.bookedBy.bookedAt) <= new Date(filters.endDate + 'T23:59:59.999Z'));
 
-                            const userMatch = !filters.userId || plot.bookedBy?.userId === filters.userId;
+                            const userMatch = !effectiveUserFilter || 
+                                (plot.bookedBy?.userId && effectiveUserFilter.ids.includes(String(plot.bookedBy.userId)));
 
                             if (dateMatch && userMatch) {
                                 bookedItems.push({
@@ -513,7 +574,8 @@ export class ProjectService {
                                             new Date(unit.bookedBy.bookedAt) >= new Date(filters.startDate) &&
                                             new Date(unit.bookedBy.bookedAt) <= new Date(filters.endDate + 'T23:59:59.999Z'));
 
-                                    const userMatch = !filters.userId || unit.bookedBy?.userId === filters.userId;
+                                    const userMatch = !effectiveUserFilter || 
+                                        (unit.bookedBy?.userId && effectiveUserFilter.ids.includes(String(unit.bookedBy.userId)));
 
                                     if (dateMatch && userMatch) {
                                         bookedItems.push({

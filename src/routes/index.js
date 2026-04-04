@@ -14,6 +14,8 @@ import campaignRoutes from './campaign.routes.js';
 import sourceRoutes from './source.routes.js';
 import googleAdIntegrationRoutes from './googleAdIntegration.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
+import attendanceRoutes from './attendance.routes.js';
+import availabilityRoutes from './availability.routes.js';
 
 
 const router = Router();
@@ -33,5 +35,7 @@ router.use('/webhooks', googleWebhookRoutes);
 router.use('/campaigns', campaignRoutes);
 router.use('/sources', sourceRoutes);
 router.use('/google-ads-integration', googleAdIntegrationRoutes);
+router.use('/attendance', attendanceRoutes);
+router.use('/availability', availabilityRoutes);
 
 export default router;

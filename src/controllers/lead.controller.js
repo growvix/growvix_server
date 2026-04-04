@@ -79,6 +79,12 @@ export class LeadController {
         const uploads = await leadService.getBulkUploads(organization);
         res.status(200).json(ApiResponse.success('Bulk uploads fetched', { uploads }));
     });
+
+    deleteLeadByProfileId = asyncHandler(async (req, res) => {
+        const { organization, profileId } = req.params;
+        const result = await leadService.deleteLeadByProfileId(organization, profileId);
+        res.status(200).json(ApiResponse.success('Lead deleted successfully', result));
+    });
 }
 
 export const leadController = new LeadController();

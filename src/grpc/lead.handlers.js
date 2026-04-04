@@ -21,34 +21,38 @@ export async function getAllLeads(req, user) {
     // Batch-resolve exe_user_name
     let userMap = {};
     try {
-        const userIds = [...new Set(leads.filter(l => l.exe_user).map(l => l.exe_user))];
-        if (userIds.length > 0) {
+        const exeUserIds = [...new Set(leads.filter(l => l.exe_user).map(l => l.exe_user))];
+        
+        if (exeUserIds.length > 0) {
             const orgConn = await getOrganizationConnection(organization);
             const ClientUser = getClientUserModel(orgConn);
-            const users = await ClientUser.find({ _id: { $in: userIds } }).select('_id profile').lean();
-            users.forEach(u => {
+            const internalUsers = await ClientUser.find({ _id: { $in: exeUserIds } }).select('_id profile').lean();
+            
+            internalUsers.forEach(u => {
                 userMap[u._id.toString()] = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
             });
         }
     } catch (err) {
-        console.error('Failed to resolve exe_user names in gRPC:', err.message);
+        console.error('Failed to resolve names in gRPC:', err.message);
     }
 
     return {
-        leads: leads.map(lead => ({
-            lead_id: lead.lead_id,
-            profile_id: lead.profile_id,
-            name: lead.name || '',
-            phone: lead.phone || '',
-            stage: lead.stage || '',
-            status: lead.status || '',
-            campaign: lead.campaign || '',
-            source: lead.source || '',
-            sub_source: lead.sub_source || '',
-            received: lead.received || '',
-            exe_user: lead.exe_user || '',
-            exe_user_name: lead.exe_user ? (userMap[lead.exe_user] || '') : '',
-        })),
+        leads: leads.map(lead => {
+            return {
+                lead_id: lead.lead_id,
+                profile_id: lead.profile_id,
+                name: lead.name || '',
+                phone: lead.phone || '',
+                stage: lead.stage || '',
+                status: lead.status || '',
+                campaign: lead.campaign || '',
+                source: lead.source || '',
+                sub_source: lead.sub_source || '',
+                received: lead.received || '',
+                exe_user: lead.exe_user || '',
+                exe_user_name: lead.exe_user ? (userMap[lead.exe_user] || '') : '',
+            };
+        }),
         total,
     };
 }

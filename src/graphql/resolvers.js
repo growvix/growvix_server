@@ -105,6 +105,9 @@ export const resolvers = {
         updateLead: async (_, { organization, id, input }, context) => {
             return await leadService.updateLead(organization, id, input, context.user);
         },
+        deleteLead: async (_, { organization, profileId }) => {
+            return await leadService.deleteLeadByProfileId(organization, profileId);
+        },
         markSiteVisitCompleted: async (_, { organization, activityId, userId }) => {
             return await leadActivityService.markSiteVisitCompleted(organization, activityId, userId);
         },

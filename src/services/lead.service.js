@@ -1,6 +1,7 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadModel } from '../models/lead.model.js';
 import { getClientUserModel } from '../models/clientUser.model.js';
+import { getCpUserModel } from '../models/cpUser.model.js';
 import { getBulkUploadModel } from '../models/bulkUpload.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import mongoose from 'mongoose';
@@ -266,9 +267,7 @@ export class LeadService {
                     query['status'] = filters.status;
                 }
             }
-            if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
-                query['exe_user'] = filters.assignedTo;
-            }
+            /* Filter by assignedTo is handled in the role-based section below to support both exe_user and cp_user */
             if (filters.stage && filters.stage !== 'undefined' && filters.stage !== 'all') {
                 query['stage'] = filters.stage;
             }
@@ -300,13 +299,44 @@ export class LeadService {
                 }
             }
 
+            // Role-based filtering
+            const role = user?.role?.toLowerCase();
+            const email = user?.email || user?.profile?.email;
+            
+            if (role === 'cp' || role === 'cp_user' || role === 'channel_partner') {
+                if (email) {
+                    const CpUser = getCpUserModel(orgConn);
+                    const orgUser = await CpUser.findOne({ "profile.email": email }).select('_id').lean();
+                    if (orgUser) {
+                        const cpId = orgUser._id.toString();
+                        // Support both assignment fields for CP users
+                        query.$or = [
+                            { cp_user: cpId },
+                            { exe_user: cpId }
+                        ];
+                    } else {
+                        // If CP user not found in this org, return empty list
+                        query['cp_user'] = '00000000-0000-0000-0000-000000000000';
+                    }
+                }
+            } else if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
+                // For admin/manager/exec, if assignedTo is provided, check both exe_user and cp_user
+                query.$or = [
+                    { exe_user: filters.assignedTo },
+                    { cp_user: filters.assignedTo }
+                ];
+            }
+
+            if (filters.cp_user) {
+                query['cp_user'] = filters.cp_user;
+            }
+
             // Run count and paginated query in parallel
             const [total, leads] = await Promise.all([
                 Lead.countDocuments(query),
                 Lead.find(query).sort({ profile_id: -1 }).skip(safeOffset).limit(safeLimit).lean(),
             ]);
 
-            const role = user?.role?.toLowerCase();
             const canShowAllPhones = role === 'admin' || role === 'manager';
             
             console.error(`[LeadService DEBUG] user_email=${user?.email || user?.profile?.email}, role=${role}, canShowAllPhones=${canShowAllPhones}`);
@@ -338,8 +368,12 @@ export class LeadService {
                 let shouldShowFullPhone = false;
                 if (canShowAllPhones) {
                     shouldShowFullPhone = true;
-                } else if (orgUserId && lead.exe_user && lead.exe_user.toString() === orgUserId) {
-                    shouldShowFullPhone = true;
+                } else if (orgUserId) {
+                    if (lead.exe_user && lead.exe_user.toString() === orgUserId) {
+                        shouldShowFullPhone = true;
+                    } else if (lead.cp_user && lead.cp_user.toString() === orgUserId) {
+                        shouldShowFullPhone = true;
+                    }
                 }
 
                 if (lead.profile_id === 10 || lead.profile_id === 9) {
@@ -363,6 +397,7 @@ export class LeadService {
                     sub_source: lead.acquired?.[0]?.sub_source || '',
                     received: receivedStr,
                     exe_user: lead.exe_user ? lead.exe_user.toString() : '',
+                    cp_user: lead.cp_user ? lead.cp_user.toString() : '',
                 };
             });
 
@@ -419,13 +454,26 @@ export class LeadService {
             const canShowAllPhones = role === 'admin' || role === 'manager';
             
             let isAssignedToMe = false;
-            if (user && !canShowAllPhones && lead.exe_user) {
+            if (user && !canShowAllPhones) {
                 const email = user.email || user.profile?.email;
                 if (email) {
+                    // Try to resolve user ID in this org (works for both ClientUser and CpUser since we find by email)
                     const ClientUser = getClientUserModel(orgConn);
-                    const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
-                    if (orgUser && orgUser._id.toString() === lead.exe_user.toString()) {
-                        isAssignedToMe = true;
+                    const CpUser = getCpUserModel(orgConn);
+                    
+                    const [clientUser, cpUser] = await Promise.all([
+                        ClientUser.findOne({ "profile.email": email }).select('_id').lean(),
+                        CpUser.findOne({ "profile.email": email }).select('_id').lean()
+                    ]);
+                    
+                    const currentOrgUserId = clientUser?._id?.toString() || cpUser?._id?.toString();
+                    
+                    if (currentOrgUserId) {
+                        if (lead.exe_user && lead.exe_user.toString() === currentOrgUserId) {
+                            isAssignedToMe = true;
+                        } else if (lead.cp_user && lead.cp_user.toString() === currentOrgUserId) {
+                            isAssignedToMe = true;
+                        }
                     }
                 }
             }
@@ -709,7 +757,6 @@ export class LeadService {
             const uploads = await BulkUpload.find({ organization })
                 .sort({ createdAt: -1 })
                 .lean();
-
             return uploads.map(u => ({
                 _id: u._id?.toString() || '',
                 uploadDate: u.createdAt ? new Date(u.createdAt).toISOString() : '',
@@ -727,6 +774,25 @@ export class LeadService {
             }));
         } catch (err) {
             throw new AppError('Failed to fetch bulk uploads: ' + err.message, 500);
+        }
+    }
+
+    async deleteLeadByProfileId(organization, profileId) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!profileId) throw new AppError('Profile ID is required', 400);
+
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            const result = await Lead.deleteOne({ profile_id: Number(profileId) });
+            if (result.deletedCount === 0) {
+                throw new AppError('Lead not found', 404);
+            }
+            return { success: true, deletedCount: result.deletedCount };
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to delete lead: ' + err.message, 500);
         }
     }
 }

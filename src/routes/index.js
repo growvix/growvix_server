@@ -14,6 +14,7 @@ import campaignRoutes from './campaign.routes.js';
 import sourceRoutes from './source.routes.js';
 import googleAdIntegrationRoutes from './googleAdIntegration.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
+import leadCaptureFormRoutes from './leadCaptureForm.routes.js';
 
 
 const router = Router();
@@ -33,5 +34,6 @@ router.use('/webhooks', googleWebhookRoutes);
 router.use('/campaigns', campaignRoutes);
 router.use('/sources', sourceRoutes);
 router.use('/google-ads-integration', googleAdIntegrationRoutes);
+router.use('/lead-capture-configs', leadCaptureFormRoutes);
 
 export default router;

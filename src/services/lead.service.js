@@ -234,9 +234,8 @@ export class LeadService {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
 
-            // Sanitize pagination params
-            const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
-            const safeLimit = Math.max(1, parseInt(limit, 10) || 30);
+            const role = user?.role?.toLowerCase();
+            const isAdminOrManager = role === 'admin' || role === 'manager';
 
             // Build query from filters
             const query = {};
@@ -256,9 +255,29 @@ export class LeadService {
                     query['status'] = filters.status;
                 }
             }
-            if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
+            
+            // Apply role-based access control
+            let orgUserId = null;
+            if (user && !isAdminOrManager) {
+                const email = user.email || user.profile?.email;
+                if (email) {
+                    const ClientUser = getClientUserModel(orgConn);
+                    const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
+                    orgUserId = orgUser?._id?.toString();
+                }
+                
+                // If restricted, only show leads assigned to this user
+                if (orgUserId) {
+                    query['exe_user'] = orgUserId;
+                } else {
+                    // Fallback: if we can't find their org-specific user ID, search for an empty set or just stay safe with a criteria that likely returns nothing for them
+                    query['exe_user'] = 'NOT_FOUND';
+                }
+            } else if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
+                // If admin/manager, they can filter by assigned user
                 query['exe_user'] = filters.assignedTo;
             }
+
             if (filters.stage && filters.stage !== 'undefined') {
                 query['stage'] = filters.stage;
             }
@@ -273,29 +292,35 @@ export class LeadService {
                 }
             }
 
+            // Sanitize pagination params
+            const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
+            const safeLimit = Math.max(1, parseInt(limit, 10) || 30);
+
+            // Optimization: projection
+            const projection = {
+                _id: 1,
+                profile_id: 1,
+                'profile.name': 1,
+                'profile.phone': 1,
+                stage: 1,
+                status: 1,
+                acquired: { $slice: 1 }, // Only need the most recent acquisition for listing
+                exe_user: 1,
+            };
+
             // Run count and paginated query in parallel
             const [total, leads] = await Promise.all([
                 Lead.countDocuments(query),
-                Lead.find(query).sort({ profile_id: -1 }).skip(safeOffset).limit(safeLimit).lean(),
+                Lead.find(query)
+                    .select(projection)
+                    .sort({ profile_id: -1 })
+                    .skip(safeOffset)
+                    .limit(safeLimit)
+                    .lean(),
             ]);
 
-            const role = user?.role?.toLowerCase();
-            const canShowAllPhones = role === 'admin' || role === 'manager';
-            
-            console.error(`[LeadService DEBUG] user_email=${user?.email || user?.profile?.email}, role=${role}, canShowAllPhones=${canShowAllPhones}`);
-
-            let orgUserId = null;
-            if (user && !canShowAllPhones) {
-                const email = user.email || user.profile?.email;
-                if (email) {
-                    const ClientUser = getClientUserModel(orgConn);
-                    const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
-                    orgUserId = orgUser?._id?.toString();
-                    console.error(`[LeadService DEBUG] user email from context: ${email}, Resolved orgUserId: ${orgUserId}`);
-                } else {
-                    console.error(`[LeadService DEBUG] User object present but no email found:`, JSON.stringify(user));
-                }
-            }
+            const canShowAllPhones = isAdminOrManager && !user?.permissions?.includes('mask_phone_number');
+            const isForcedMasking = user?.permissions?.includes('mask_phone_number');
 
             const mappedLeads = leads.map(lead => {
                 const receivedValue = lead.acquired?.[0]?.received;
@@ -305,18 +330,17 @@ export class LeadService {
                     receivedStr = !isNaN(date.getTime()) ? date.toISOString() : String(receivedValue);
                 }
 
-                let phoneValue = lead.profile?.phone || '';
+                const phoneValue = lead.profile?.phone || '';
                 
-                // Final unmasking decision
+                // Unmasking decision: show for admin/manager or if assigned to the user
+                // UNLESS forced masking is enabled for this user.
                 let shouldShowFullPhone = false;
-                if (canShowAllPhones) {
-                    shouldShowFullPhone = true;
-                } else if (orgUserId && lead.exe_user && lead.exe_user.toString() === orgUserId) {
-                    shouldShowFullPhone = true;
-                }
-
-                if (lead.profile_id === 10 || lead.profile_id === 9) {
-                    console.error(`[LeadService DEBUG] Lead #${lead.profile_id}: shouldShowFullPhone=${shouldShowFullPhone}, canShowAllPhones=${canShowAllPhones}, orgUserId=${orgUserId}, lead.exe_user=${lead.exe_user}`);
+                if (!isForcedMasking) {
+                    if (canShowAllPhones) {
+                        shouldShowFullPhone = true;
+                    } else if (orgUserId && lead.exe_user && lead.exe_user.toString() === orgUserId) {
+                        shouldShowFullPhone = true;
+                    }
                 }
 
                 let finalPhone = phoneValue;
@@ -330,7 +354,7 @@ export class LeadService {
                     name: lead.profile?.name || '',
                     phone: finalPhone,
                     stage: lead.stage || '',
-                    status: lead.status === 'Untouched' ? 'No Activity' : (lead.status || ''),
+                    status: (lead.status === 'Untouched' || lead.status === 'No Activity') ? 'No Activity' : (lead.status || ''),
                     campaign: lead.acquired?.[0]?.campaign || '',
                     source: lead.acquired?.[0]?.source || '',
                     sub_source: lead.acquired?.[0]?.sub_source || '',
@@ -389,10 +413,12 @@ export class LeadService {
             };
 
             const role = user?.role?.toLowerCase();
-            const canShowAllPhones = role === 'admin' || role === 'manager';
+            const isAdminOrManager = role === 'admin' || role === 'manager';
+            const isForcedMasking = user?.permissions?.includes('mask_phone_number');
+            const canShowAllPhones = isAdminOrManager && !isForcedMasking;
             
             let isAssignedToMe = false;
-            if (user && !canShowAllPhones && lead.exe_user) {
+            if (user && !canShowAllPhones && lead.exe_user && !isForcedMasking) {
                 const email = user.email || user.profile?.email;
                 if (email) {
                     const ClientUser = getClientUserModel(orgConn);
@@ -404,7 +430,7 @@ export class LeadService {
             }
 
             let phone = lead.profile?.phone || '';
-            if (phone && phone !== "-" && !canShowAllPhones && !isAssignedToMe) {
+            if (phone && phone !== "-" && (isForcedMasking || (!canShowAllPhones && !isAssignedToMe))) {
                 phone = this._maskPhoneNumber(phone);
             }
 

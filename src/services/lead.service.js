@@ -31,16 +31,26 @@ export class LeadService {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
 
-            const phone = data.profile?.phone || (data.phone ? String(data.phone).trim() : '');
-            const email = data.profile?.email || (data.email ? String(data.email).trim() : '');
+            let phone = data.profile?.phone || (data.phone ? String(data.phone).trim() : '');
+            let email = data.profile?.email || (data.email ? String(data.email).trim() : '');
+
+            // Aggressive cleaning to ensure format-less match
+            if (phone) phone = String(phone).replace(/[\s\-\(\)]/g, '').trim();
+            if (email) email = String(email).toLowerCase().trim();
 
             let existingLead = null;
             if (phone || email) {
                 const query = { organization };
                 const orConditions = [];
                 const normalized = this._normalizePhone(phone);
-                if (normalized) orConditions.push({ 'profile.phone': { $regex: normalized + '$' } });
-                if (email) orConditions.push({ 'profile.email': email });
+                
+                if (normalized) {
+                    // Match by the last 10 digits as a suffix regex — this is common for Indian mobile numbers
+                    orConditions.push({ 'profile.phone': { $regex: normalized + '$' } });
+                }
+                if (email) {
+                    orConditions.push({ 'profile.email': email });
+                }
 
                 if (orConditions.length > 0) {
                     query.$or = orConditions;

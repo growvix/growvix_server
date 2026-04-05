@@ -42,8 +42,11 @@ class GoogleWebhookService {
         const cols = data.user_column_data || [];
 
         const name = getField(cols, 'FULL_NAME') || `Google Lead`;
-        const email = getField(cols, 'EMAIL');
-        const phone = getField(cols, 'PHONE_NUMBER');
+        let email = getField(cols, 'EMAIL');
+        let phone = getField(cols, 'PHONE_NUMBER');
+
+        if (email) email = email.toLowerCase().trim();
+        if (phone) phone = phone.replace(/[\s\-\(\)]/g, '').trim();
 
         const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
 
@@ -105,7 +108,10 @@ class GoogleWebhookService {
                 // Mapped to a CRM field (e.g. "profile.name", "profile.email", "profile.phone", "profile.location")
                 const parts = mapEntry.crm_field.split('.');
                 if (parts[0] === 'profile' && parts[1]) {
-                    profile[parts[1]] = value;
+                    let cleanedValue = value;
+                    if (parts[1] === 'phone') cleanedValue = String(value).replace(/[\s\-\(\)]/g, '').trim();
+                    if (parts[1] === 'email') cleanedValue = String(value).toLowerCase().trim();
+                    profile[parts[1]] = cleanedValue;
                 }
             } else {
                 // Unmapped or explicitly marked as requirement

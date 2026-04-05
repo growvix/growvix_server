@@ -130,6 +130,7 @@ export const typeDefs = `#graphql
         exe_user: String
         exe_user_name: String
         exe_user_image: String
+        number_of_re_engagement: Int
         createdAt: String
         updatedAt: String
         site_visits_completed: Int

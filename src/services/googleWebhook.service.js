@@ -3,6 +3,7 @@ import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadModel } from '../models/lead.model.js';
 import { getGoogleWebhookEventModel } from '../models/googleWebhookEvent.model.js';
 import { roundRobinService } from './roundRobin.service.js';
+import { leadService } from './lead.service.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -60,11 +61,7 @@ class GoogleWebhookService {
             .filter(f => !customFields.includes(f.column_id) && f.string_value)
             .map(f => ({ key: f.column_id, value: f.string_value }));
 
-        const profile_id = await getNextProfileId(Lead);
-
-        const lead = await Lead.create({
-            _id: uuidv4(),
-            profile_id,
+        const leadData = {
             organization,
             profile: { name, email, phone },
             acquired: [acquired],
@@ -72,9 +69,9 @@ class GoogleWebhookService {
             stage: 'new lead',
             status: 'No Activity',
             exe_user: assignedUserId || undefined,
-            created_at: new Date(),
-            updated_at: new Date(),
-        });
+        };
+
+        const lead = await leadService.addLead(leadData);
 
         console.log(
             `[Google Webhook] Lead created: ${lead._id} | Name: ${name} | Org: ${organization} | Assigned to: ${assignedUserId || 'unassigned'}`
@@ -138,21 +135,17 @@ class GoogleWebhookService {
             medium: 'Google Lead Form',
         };
 
-        const profile_id = await getNextProfileId(Lead);
-
-        const lead = await Lead.create({
-            _id: uuidv4(),
-            profile_id,
+        const leadData = {
             organization,
             profile,
             acquired: [acquired],
             requirements,
-            stage: 'new',
-            status: 'active',
+            stage: 'new lead',
+            status: 'No Activity',
             exe_user: assignedUserId || undefined,
-            created_at: new Date(),
-            updated_at: new Date(),
-        });
+        };
+
+        const lead = await leadService.addLead(leadData);
 
         console.log(
             `[Google Webhook] Lead created (mapped): ${lead._id} | Name: ${profile.name} | Org: ${organization} | Assigned to: ${assignedUserId || 'unassigned'}`

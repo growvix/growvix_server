@@ -16,7 +16,6 @@ export class LeadService {
     }
 
     async addLead(data) {
-        // ... (existing addLead remains unchanged above) ...
         const organization = data.organization;
         if (!organization) {
             throw new AppError('Organization is required', 400);
@@ -25,9 +24,49 @@ export class LeadService {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
 
+            const phone = data.profile?.phone || (data.phone ? String(data.phone).trim() : '');
+            const email = data.profile?.email || (data.email ? String(data.email).trim() : '');
+
+            let existingLead = null;
+            if (phone || email) {
+                const query = { organization };
+                const orConditions = [];
+                if (phone) orConditions.push({ 'profile.phone': phone });
+                if (email) orConditions.push({ 'profile.email': email });
+
+                if (orConditions.length > 0) {
+                    query.$or = orConditions;
+                    existingLead = await Lead.findOne(query);
+                }
+            }
+
+            // Ensure profile structure is correct for new leads
+            if (!data.profile) data.profile = {};
+            if (!data.profile.phone && phone) data.profile.phone = phone;
+            if (!data.profile.email && email) data.profile.email = email;
+            if (!data.profile.name && data.name) data.profile.name = data.name;
+
+            if (existingLead) {
+                // If the new lead's either phone number or mail id exists, update re-engagement
+                const newAcquisition = {
+                    campaign: data.campaign || data.acquired?.[0]?.campaign || '',
+                    source: data.source || data.acquired?.[0]?.source || '',
+                    sub_source: data.sub_source || data.acquired?.[0]?.sub_source || '',
+                    medium: data.medium || data.acquired?.[0]?.medium || '',
+                    received: data.received || data.acquired?.[0]?.received || new Date(),
+                    created_at: data.created_at || data.acquired?.[0]?.created_at || new Date(),
+                };
+
+                await Lead.findByIdAndUpdate(existingLead._id, {
+                    $push: { acquired: newAcquisition },
+                    $inc: { number_of_re_engagement: 1 }
+                });
+
+                return await Lead.findById(existingLead._id).lean();
+            }
             // Auto-generate sequential profile_id
             const lastLead = await Lead.findOne().sort({ profile_id: -1 }).select('profile_id');
-            const nextProfileId = lastLead ? lastLead.profile_id + 1 : 1;
+            const nextProfileId = (lastLead && typeof lastLead.profile_id === 'number') ? lastLead.profile_id + 1 : 1;
             data.profile_id = nextProfileId;
 
             // Set default stage to 1 (new lead) if not provided
@@ -52,6 +91,20 @@ export class LeadService {
                     }
                 } catch (rrErr) {
                     console.error('Round-robin assignment failed (lead will be unassigned):', rrErr.message);
+                }
+            }
+
+            // Initialize acquired array if not provided but campaign/source info exists
+            if (!data.acquired || data.acquired.length === 0) {
+                if (data.campaign || data.source || data.medium || data.sub_source) {
+                    data.acquired = [{
+                        campaign: data.campaign || '',
+                        source: data.source || '',
+                        sub_source: data.sub_source || '',
+                        medium: data.medium || '',
+                        received: new Date(),
+                        created_at: new Date()
+                    }];
                 }
             }
 
@@ -179,9 +232,42 @@ export class LeadService {
             }
 
             let insertedCount = 0;
+            let updatedCount = 0;
             if (validLeads.length > 0) {
-                const inserted = await Lead.insertMany(validLeads);
-                insertedCount = inserted.length;
+                const bulkOps = validLeads.map(lead => ({
+                    updateOne: {
+                        filter: {
+                            organization: lead.organization,
+                            $or: [
+                                { 'profile.phone': lead.profile.phone },
+                                { 'profile.email': lead.profile.email }
+                            ]
+                        },
+                        update: {
+                            $push: { acquired: { $each: lead.acquired } },
+                            $inc: { number_of_re_engagement: lead.number_of_re_engagement || 1 },
+                            $setOnInsert: {
+                                _id: lead._id,
+                                profile_id: lead.profile_id,
+                                profile: lead.profile,
+                                organization: lead.organization,
+                                stage: lead.stage,
+                                status: lead.status,
+                                exe_user: lead.exe_user,
+                                project: lead.project || [],
+                                interested_projects: lead.interested_projects || [],
+                                requirement: lead.requirement || {},
+                                created_at: new Date(),
+                                updated_at: new Date()
+                            }
+                        },
+                        upsert: true
+                    }
+                }));
+
+                const result = await Lead.bulkWrite(bulkOps);
+                insertedCount = result.upsertedCount;
+                updatedCount = result.modifiedCount;
             }
 
             // Determine first source/campaign from the data for the batch record
@@ -194,8 +280,8 @@ export class LeadService {
 
             // Determine status
             let status = 'Success';
-            if (insertedCount === 0 && errors.length > 0) status = 'Error';
-            else if (errors.length > 0 && insertedCount > 0) status = 'Partial';
+            if (insertedCount === 0 && updatedCount === 0 && errors.length > 0) status = 'Error';
+            else if (errors.length > 0 && (insertedCount > 0 || updatedCount > 0)) status = 'Partial';
 
             // Save bulk upload record
             const BulkUpload = getBulkUploadModel(orgConn);
@@ -205,7 +291,7 @@ export class LeadService {
                 fileName: fileName || 'Unknown',
                 totalLeads: leadsData.length - startIndex,
                 uploadedLeads: insertedCount,
-                existingLeads: 0,
+                existingLeads: updatedCount,
                 errorLeads: errors.length,
                 source: batchSource,
                 campaign: batchCampaign,
@@ -217,10 +303,11 @@ export class LeadService {
             });
 
             return {
-                totalRows: leadsData.length - startIndex,
-                successCount: insertedCount,
+                totalLeads: leadsData.length - startIndex,
+                insertedCount,
+                updatedCount,
                 errorCount: errors.length,
-                errors: errors
+                errors: errors.slice(0, 50) // Limit errors in response
             };
         } catch (err) {
             throw new AppError('Failed to bulk insert leads: ' + err.message, 500);
@@ -266,7 +353,7 @@ export class LeadService {
                     query['status'] = filters.status;
                 }
             }
-            
+
             // Apply role-based access control
             let orgUserId = null;
             if (user && !isAdminOrManager) {
@@ -276,7 +363,7 @@ export class LeadService {
                     const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
                     orgUserId = orgUser?._id?.toString();
                 }
-                
+
                 // If restricted, only show leads assigned to this user
                 if (orgUserId) {
                     query['exe_user'] = orgUserId;
@@ -322,7 +409,7 @@ export class LeadService {
 
             // Role-based filtering
             const email = user?.email || user?.profile?.email;
-            
+
             if (role === 'cp' || role === 'cp_user' || role === 'channel_partner') {
                 if (email) {
                     const CpUser = getCpUserModel(orgConn);
@@ -390,7 +477,7 @@ export class LeadService {
                 }
 
                 const phoneValue = lead.profile?.phone || '';
-                
+
                 // Unmasking decision: show for admin/manager or if assigned to the user
                 // UNLESS forced masking is enabled for this user.
                 let shouldShowFullPhone = false;
@@ -476,7 +563,7 @@ export class LeadService {
             const isAdminOrManager = role === 'admin' || role === 'manager';
             const isForcedMasking = user?.permissions?.includes('mask_phone_number');
             const canShowAllPhones = isAdminOrManager && !isForcedMasking;
-            
+
             let isAssignedToMe = false;
             if (user && !canShowAllPhones && lead.exe_user && !isForcedMasking) {
                 const email = user.email || user.profile?.email;
@@ -484,14 +571,14 @@ export class LeadService {
                     // Try to resolve user ID in this org (works for both ClientUser and CpUser since we find by email)
                     const ClientUser = getClientUserModel(orgConn);
                     const CpUser = getCpUserModel(orgConn);
-                    
+
                     const [clientUser, cpUser] = await Promise.all([
                         ClientUser.findOne({ "profile.email": email }).select('_id').lean(),
                         CpUser.findOne({ "profile.email": email }).select('_id').lean()
                     ]);
-                    
+
                     const currentOrgUserId = clientUser?._id?.toString() || cpUser?._id?.toString();
-                    
+
                     if (currentOrgUserId) {
                         if (lead.exe_user && lead.exe_user.toString() === currentOrgUserId) {
                             isAssignedToMe = true;
@@ -511,7 +598,7 @@ export class LeadService {
             let exe_user_image = '';
             if (lead.exe_user) {
                 const ClientUser = getClientUserModel(orgConn);
-                
+
                 // Try finding by UUID first
                 let exeUser;
                 try {
@@ -591,6 +678,7 @@ export class LeadService {
                     project_name: ip.project_name,
                 })),
                 merge_id: lead.merge_id || [],
+                number_of_re_engagement: lead.number_of_re_engagement || 0,
                 acquired: transformAcquired(lead.acquired),
                 requirements: (lead.requirements || []).map(r => ({
                     _id: r._id?.toString() || '',

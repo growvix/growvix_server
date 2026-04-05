@@ -105,6 +105,9 @@ export const resolvers = {
         updateLead: async (_, { organization, id, input }, context) => {
             return await leadService.updateLead(organization, id, input, context.user);
         },
+        deleteLead: async (_, { organization, profileId }) => {
+            return await leadService.deleteLeadByProfileId(organization, profileId);
+        },
         markSiteVisitCompleted: async (_, { organization, activityId, userId }) => {
             return await leadActivityService.markSiteVisitCompleted(organization, activityId, userId);
         },
@@ -144,9 +147,34 @@ export const resolvers = {
             try {
                 const orgConn = await getOrganizationConnection(parent.organization);
                 const ClientUser = getClientUserModel(orgConn);
-                const user = await ClientUser.findById(parent.exe_user).select('profile').lean();
+                
+                let user;
+                if (typeof parent.exe_user === 'string' && parent.exe_user.length > 20) {
+                    user = await ClientUser.findById(parent.exe_user).select('profile').lean();
+                } else {
+                    const profId = parseInt(parent.exe_user, 10);
+                    if (!isNaN(profId)) {
+                        user = await ClientUser.findOne({ profile_id: profId }).select('profile').lean();
+                    }
+                }
+
                 if (user) {
                     return `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim();
+                }
+
+                // Fallback to global
+                let globalUser;
+                if (typeof parent.exe_user === 'string' && parent.exe_user.length > 20) {
+                    globalUser = await User.findById(parent.exe_user).select('profile').lean();
+                } else {
+                    const profId = parseInt(parent.exe_user, 10);
+                    if (!isNaN(profId)) {
+                        globalUser = await User.findOne({ profile_id: profId }).select('profile').lean();
+                    }
+                }
+
+                if (globalUser) {
+                    return `${globalUser.profile?.firstName || ''} ${globalUser.profile?.lastName || ''}`.trim();
                 }
             } catch (err) {
                 console.error('Failed to resolve exe_user_name:', err.message);
@@ -154,21 +182,43 @@ export const resolvers = {
             return '';
         },
         exe_user_image: async (parent) => {
-            // Priority 1: Field already populated by service
-            if (parent.exe_user_image) return parent.exe_user_image;
+            // Priority 1: Field already populated by service (should be a non-empty string)
+            if (parent.exe_user_image && typeof parent.exe_user_image === 'string' && parent.exe_user_image.length > 0) {
+                return parent.exe_user_image;
+            }
             if (!parent.exe_user || !parent.organization) return '';
             
             try {
                 // Priority 2: Look in Organization Database
                 const orgConn = await getOrganizationConnection(parent.organization);
                 const ClientUser = getClientUserModel(orgConn);
-                const user = await ClientUser.findById(parent.exe_user).select('profile').lean();
+                
+                let user;
+                // Support both UUID and profile_id
+                if (typeof parent.exe_user === 'string' && parent.exe_user.length > 20) {
+                    user = await ClientUser.findById(parent.exe_user).select('profile').lean();
+                } else {
+                    const profId = parseInt(parent.exe_user, 10);
+                    if (!isNaN(profId)) {
+                        user = await ClientUser.findOne({ profile_id: profId }).select('profile').lean();
+                    }
+                }
+
                 if (user?.profile?.profileImagePath) {
                     return user.profile.profileImagePath;
                 }
 
                 // Priority 3: Fallback to Global Database
-                const globalUser = await User.findById(parent.exe_user).select('profile').lean();
+                let globalUser;
+                if (typeof parent.exe_user === 'string' && parent.exe_user.length > 20) {
+                    globalUser = await User.findById(parent.exe_user).select('profile').lean();
+                } else {
+                    const profId = parseInt(parent.exe_user, 10);
+                    if (!isNaN(profId)) {
+                        globalUser = await User.findOne({ profile_id: profId }).select('profile').lean();
+                    }
+                }
+
                 if (globalUser?.profile?.profileImagePath) {
                     return globalUser.profile.profileImagePath;
                 }
@@ -180,23 +230,45 @@ export const resolvers = {
     },
     LeadActivity: {
         user_image: async (parent) => {
-            if (parent.user_image) return parent.user_image;
+            if (parent.user_image && typeof parent.user_image === 'string' && parent.user_image.length > 0) {
+                return parent.user_image;
+            }
             if (!parent.user_id || !parent.organization) return '';
             
             try {
                 const orgConn = await getOrganizationConnection(parent.organization);
                 const ClientUser = getClientUserModel(orgConn);
-                const user = await ClientUser.findById(parent.user_id).select('profile').lean();
+                
+                let user;
+                if (typeof parent.user_id === 'string' && parent.user_id.length > 20) {
+                    user = await ClientUser.findById(parent.user_id).select('profile').lean();
+                } else {
+                    const pId = parseInt(parent.user_id, 10);
+                    if (!isNaN(pId)) {
+                        user = await ClientUser.findOne({ profile_id: pId }).select('profile').lean();
+                    }
+                }
+
                 if (user?.profile?.profileImagePath) {
                     return user.profile.profileImagePath;
                 }
 
-                const globalUser = await User.findById(parent.user_id).select('profile').lean();
+                // Fallback to global
+                let globalUser;
+                if (typeof parent.user_id === 'string' && parent.user_id.length > 20) {
+                    globalUser = await User.findById(parent.user_id).select('profile').lean();
+                } else {
+                    const pId = parseInt(parent.user_id, 10);
+                    if (!isNaN(pId)) {
+                        globalUser = await User.findOne({ profile_id: pId }).select('profile').lean();
+                    }
+                }
+
                 if (globalUser?.profile?.profileImagePath) {
                     return globalUser.profile.profileImagePath;
                 }
             } catch (err) {
-                console.error('Failed to resolve user_image for activity:', err.message);
+                console.error('Failed to resolve activity user_image:', err.message);
             }
             return '';
         },

@@ -237,4 +237,6 @@ router.put('/:id', protect, authorizePermission('edit_inventory'), projectContro
  */
 router.post('/:id/book', projectController.bookUnit);
 
+router.post('/:id/reverse-book', projectController.reverseBooking);
+
 export default router;

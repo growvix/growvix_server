@@ -49,6 +49,7 @@ const LeadSchema = new Schema(
         created_at: { type: Date },
         updated_at: { type: Date },
         exe_user: { type: Schema.Types.UUID },
+        cp_user: { type: Schema.Types.UUID },
         important_activities: [{
             activity_id: { type: String, required: true },
             marked_at: { type: Date, default: Date.now },

@@ -19,8 +19,15 @@ export const protect = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, env.JWT_SECRET);
+        
+        let user = await User.findById(decoded.id);
+        
+        // If not found in User model, check GlobalCpUser model (for Channel Partners)
+        if (!user) {
+            const { GlobalCpUser } = await import('../models/cpUser.model.js');
+            user = await GlobalCpUser.findById(decoded.id);
+        }
 
-        const user = await User.findById(decoded.id);
         if (!user) {
             return next(new AppError('User not found with this token', 401));
         }
@@ -33,18 +40,37 @@ export const protect = async (req, res, next) => {
 };
 
 export const authorize = (...roles) => {
+    // 🛡️ Robust Role Normalization
+    // Support multiple arguments, arrays, and comma-separated strings
+    const allowedRoles = roles.flatMap(role => {
+        if (Array.isArray(role)) return role.map(r => String(r).trim().toLowerCase());
+        if (typeof role === 'string') return role.split(',').map(r => r.trim().toLowerCase());
+        return [String(role).trim().toLowerCase()];
+    });
+
     return (req, res, next) => {
+        if (!req.user) {
+            return next(new AppError('User not found in request context', 401));
+        }
+
+        const userRole = req.user.role?.toLowerCase().trim();
+
         // Admins bypass role restrictions
-        if (req.user && req.user.role === 'admin') {
+        if (userRole === 'admin') {
             return next();
         }
 
-        if (!req.user || !roles.includes(req.user.role) ) {
-            return next(
-                new AppError(`User role ${req.user?.role} is not authorized to access this route`, 403)
-            );
+        // Managers often have organization-level access.
+        // We explicitly check if 'manager' is in allowed set or if they match exactly.
+        if (userRole && allowedRoles.includes(userRole)) {
+            return next();
         }
-        next();
+
+        // If not matched, throw detailed error
+        const rolesList = allowedRoles.join(', ');
+        return next(
+            new AppError(`Access Denied: Role '${req.user.role}' is not authorized for this action. Required one of: [${rolesList}]`, 403)
+        );
     };
 };
 

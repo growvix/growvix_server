@@ -207,13 +207,14 @@ export class AuthService {
         }
 
         // 🛡️ SECURITY CHECKS for Managers
+        const normalizedTargetRole = targetUser.role?.toLowerCase().trim();
         if (callerRole === 'manager') {
             // Check if target is in the same organization
             if (String(targetUser.organization) !== String(callerUser.organization)) {
                 throw new AppError('You can only impersonate users within your own organization', 403);
             }
             // Check if target is a regular "user"
-            if (targetUser.role?.toLowerCase() !== 'user') {
+            if (normalizedTargetRole !== 'user') {
                 throw new AppError('Managers are only permitted to impersonate accounts with the "user" role', 403);
             }
         }

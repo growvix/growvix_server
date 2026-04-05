@@ -44,9 +44,9 @@ const profilePictureStorage = multer.diskStorage({
 // File filter - accept images and PDFs/Docs
 const fileFilter = (req, file, cb) => {
     const allowedTypes = [
-        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 
-        'application/pdf', 
-        'application/msword', 
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+        'application/pdf',
+        'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ];
     if (allowedTypes.includes(file.mimetype)) {

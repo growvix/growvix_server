@@ -1,6 +1,23 @@
 import { Schema } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
+// Sub-Source Schema — nested inside a Source
+const SubSourceSchema = new Schema({
+    uuid: { type: String, default: () => uuidv4() },
+    subSourceName: { type: String, required: true },
+    project: {
+        projectId: { type: String },
+        projectName: { type: String }
+    }
+}, { _id: false });
+
+// Source Schema — nested inside Campaign
+const SourceSchema = new Schema({
+    uuid: { type: String, default: () => uuidv4() },
+    sourceName: { type: String, required: true },
+    subSources: [SubSourceSchema]
+}, { _id: false });
+
 const CampaignSchema = new Schema(
     {
         uuid: { 
@@ -13,20 +30,7 @@ const CampaignSchema = new Schema(
             projectId: { type: String },
             projectName: { type: String }
         },
-        inputChannels: [
-            {
-                uuid: { type: String, default: () => uuidv4() },
-                publisher: { type: String },
-                source: { type: String },
-                subSource: { type: String },
-                medium: { type: String },
-                campaignType: { type: String },
-                integrationType: { type: String },
-                redirectionUrl: { type: String },
-                projectId: { type: String },
-                projectName: { type: String }
-            }
-        ],
+        sources: [SourceSchema],
         organization: { type: String, required: true, index: true },
         status: { type: Boolean, default: true },
     },

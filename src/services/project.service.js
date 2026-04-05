@@ -528,7 +528,9 @@ export class ProjectService {
 
             // Fetch missing or masked phone numbers from Leads
             const leadModel = getLeadModel(orgConn);
-            const canShowLeadPhone = (requester.permissions || []).includes('view_lead_phone') || requester.role === 'admin';
+            const permissions = requester?.permissions || [];
+            const isForcedMasking = permissions.includes('mask_phone_number');
+            const canShowLeadPhone = (permissions.includes('view_lead_phone') || requester?.role === 'admin') && !isForcedMasking;
 
             for (let i = 0; i < bookedItems.length; i++) {
                 const item = bookedItems[i];
@@ -660,7 +662,9 @@ export class ProjectService {
 
             // Fetch missing or masked phone numbers from Leads
             const leadModel = getLeadModel(orgConn);
-            const canShowLeadPhone = (requester.permissions || []).includes('view_lead_phone') || requester.role === 'admin';
+            const permissions = requester?.permissions || [];
+            const isForcedMasking = permissions.includes('mask_phone_number');
+            const canShowLeadPhone = (permissions.includes('view_lead_phone') || requester?.role === 'admin') && !isForcedMasking;
 
             for (let i = 0; i < bookedItems.length; i++) {
                 const item = bookedItems[i];

@@ -3,6 +3,7 @@ import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadModel } from '../models/lead.model.js';
 import { getGoogleWebhookEventModel } from '../models/googleWebhookEvent.model.js';
 import { roundRobinService } from './roundRobin.service.js';
+import { leadService } from './lead.service.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -41,8 +42,11 @@ class GoogleWebhookService {
         const cols = data.user_column_data || [];
 
         const name = getField(cols, 'FULL_NAME') || `Google Lead`;
-        const email = getField(cols, 'EMAIL');
-        const phone = getField(cols, 'PHONE_NUMBER');
+        let email = getField(cols, 'EMAIL');
+        let phone = getField(cols, 'PHONE_NUMBER');
+
+        if (email) email = email.toLowerCase().trim();
+        if (phone) phone = phone.replace(/[\s\-\(\)]/g, '').trim();
 
         const assignedUserId = await roundRobinService.getNextPreSalesUser(organization);
 
@@ -60,11 +64,7 @@ class GoogleWebhookService {
             .filter(f => !customFields.includes(f.column_id) && f.string_value)
             .map(f => ({ key: f.column_id, value: f.string_value }));
 
-        const profile_id = await getNextProfileId(Lead);
-
-        const lead = await Lead.create({
-            _id: uuidv4(),
-            profile_id,
+        const leadData = {
             organization,
             profile: { name, email, phone },
             acquired: [acquired],
@@ -72,9 +72,9 @@ class GoogleWebhookService {
             stage: 'new lead',
             status: 'No Activity',
             exe_user: assignedUserId || undefined,
-            created_at: new Date(),
-            updated_at: new Date(),
-        });
+        };
+
+        const lead = await leadService.addLead(leadData);
 
         console.log(
             `[Google Webhook] Lead created: ${lead._id} | Name: ${name} | Org: ${organization} | Assigned to: ${assignedUserId || 'unassigned'}`
@@ -108,7 +108,10 @@ class GoogleWebhookService {
                 // Mapped to a CRM field (e.g. "profile.name", "profile.email", "profile.phone", "profile.location")
                 const parts = mapEntry.crm_field.split('.');
                 if (parts[0] === 'profile' && parts[1]) {
-                    profile[parts[1]] = value;
+                    let cleanedValue = value;
+                    if (parts[1] === 'phone') cleanedValue = String(value).replace(/[\s\-\(\)]/g, '').trim();
+                    if (parts[1] === 'email') cleanedValue = String(value).toLowerCase().trim();
+                    profile[parts[1]] = cleanedValue;
                 }
             } else {
                 // Unmapped or explicitly marked as requirement
@@ -138,21 +141,17 @@ class GoogleWebhookService {
             medium: 'Google Lead Form',
         };
 
-        const profile_id = await getNextProfileId(Lead);
-
-        const lead = await Lead.create({
-            _id: uuidv4(),
-            profile_id,
+        const leadData = {
             organization,
             profile,
             acquired: [acquired],
             requirements,
-            stage: 'new',
-            status: 'active',
+            stage: 'new lead',
+            status: 'No Activity',
             exe_user: assignedUserId || undefined,
-            created_at: new Date(),
-            updated_at: new Date(),
-        });
+        };
+
+        const lead = await leadService.addLead(leadData);
 
         console.log(
             `[Google Webhook] Lead created (mapped): ${lead._id} | Name: ${profile.name} | Org: ${organization} | Assigned to: ${assignedUserId || 'unassigned'}`

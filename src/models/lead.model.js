@@ -44,6 +44,7 @@ const LeadSchema = new Schema(
             created_at: { type: Date },
             medium: { type: String },
         }],
+        number_of_re_engagement: { type: Number, default: 0 },
         stage: { type: String },
         status: { type: String },
         created_at: { type: Date },
@@ -66,6 +67,8 @@ const LeadSchema = new Schema(
 LeadSchema.index({ organization: 1, exe_user: 1, status: 1 });
 LeadSchema.index({ organization: 1, profile_id: -1 });
 LeadSchema.index({ organization: 1, 'profile.name': 1 });
+LeadSchema.index({ organization: 1, 'profile.phone': 1 });
+LeadSchema.index({ organization: 1, 'profile.email': 1 });
 LeadSchema.index({ organization: 1, 'acquired.source': 1 });
 
 export const getLeadModel = (connection) => {

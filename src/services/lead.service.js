@@ -15,6 +15,13 @@ export class LeadService {
         return `********${phone.slice(-2)}`;
     }
 
+    _normalizePhone(phone) {
+        if (!phone) return '';
+        const digits = String(phone).replace(/\D/g, ''); // Remove all non-digits
+        // For Indian numbers, the last 10 digits are typically the unique part
+        return digits.length >= 10 ? digits.slice(-10) : digits;
+    }
+
     async addLead(data) {
         const organization = data.organization;
         if (!organization) {
@@ -31,7 +38,8 @@ export class LeadService {
             if (phone || email) {
                 const query = { organization };
                 const orConditions = [];
-                if (phone) orConditions.push({ 'profile.phone': phone });
+                const normalized = this._normalizePhone(phone);
+                if (normalized) orConditions.push({ 'profile.phone': { $regex: normalized + '$' } });
                 if (email) orConditions.push({ 'profile.email': email });
 
                 if (orConditions.length > 0) {
@@ -239,7 +247,7 @@ export class LeadService {
                         filter: {
                             organization: lead.organization,
                             $or: [
-                                { 'profile.phone': lead.profile.phone },
+                                { 'profile.phone': { $regex: this._normalizePhone(lead.profile.phone) + '$' } },
                                 { 'profile.email': lead.profile.email }
                             ]
                         },

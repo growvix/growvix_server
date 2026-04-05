@@ -23,18 +23,16 @@ export class UserController {
         const org = organization || req.user?.organization;
 
         let result;
-        if (org) {
-            // Get users from organization-specific database
-            result = await userService.getOrganizationUsers(org, Number(limit) || 50, Number(page) || 1, req.user);
-        } else {
-            // Get all users from global database (admin view)
-            result = await userService.getAllUsers({ 
-                limit: Number(limit) || 50, 
-                page: Number(page) || 1, 
-                organization: org,
-                requester: req.user
-            });
-        }
+        // All roles now fetch from global database for consistency in user listing
+        // But for non-admins, we MUST enforce their own organization filter
+        const finalOrg = req.user?.role === 'admin' ? org : req.user?.organization;
+
+        result = await userService.getAllUsers({ 
+            limit: Number(limit) || 50, 
+            page: Number(page) || 1, 
+            organization: finalOrg,
+            requester: req.user
+        });
         res.status(200).json(ApiResponse.success('Users retrieved', result));
     });
 
@@ -76,8 +74,8 @@ export class UserController {
             );
         }
 
-        // ❌ cannot edit another manager
-        if (targetUser.role === "manager") {
+        // ❌ cannot edit another manager (but can edit self)
+        if (targetUser.role === "manager" && currentUser._id.toString() !== targetUserId) {
             return res.status(403).json(
                 ApiResponse.error("You cannot edit another manager")
             );

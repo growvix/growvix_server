@@ -194,5 +194,24 @@ router.get('/search/:organization/:profileId', leadController.getLeadByProfileId
  */
 router.get('/bulk-uploads/:organization', leadController.getBulkUploads);
 
+/**
+ * @swagger
+ * /api/leads/{organization}/{profileId}:
+ *   delete:
+ *     summary: Delete a lead by profile ID
+ *     tags: [Leads]
+ *     parameters:
+ *       - in: path
+ *         name: organization
+ *         required: true
+ *       - in: path
+ *         name: profileId
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Lead deleted successfully
+ */
+router.delete('/:organization/:profileId', leadController.deleteLeadByProfileId);
+
 export default router;
 

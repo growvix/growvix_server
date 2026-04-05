@@ -391,12 +391,24 @@ export class DashboardService {
             .select('_id profile_id profile role department')
             .lean();
 
+        // Fallback: Populate missing profile images from global User collection
+        const { User } = await import('../models/user.model.js');
+        const profileIds = users.filter(u => !u.profile?.profileImagePath).map(u => u.profile_id);
+        
+        let globalUsersRel = [];
+        if (profileIds.length > 0) {
+            globalUsersRel = await User.find({ profile_id: { $in: profileIds } }).select('profile_id profile.profileImagePath').lean();
+        }
+
+        const globalImageMap = new Map(globalUsersRel.map(gu => [gu.profile_id, gu.profile?.profileImagePath]));
+
         return users.map(u => ({
             id: u._id?.toString() || '',
             profile_id: u.profile_id,
             name: `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim() || 'Unknown',
             role: u.role || 'user',
             department: u.department || '',
+            profileImagePath: u.profile?.profileImagePath || globalImageMap.get(u.profile_id) || '',
         }));
     }
 }

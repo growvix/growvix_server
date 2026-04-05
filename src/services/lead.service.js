@@ -1,6 +1,7 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getLeadModel } from '../models/lead.model.js';
 import { getClientUserModel } from '../models/clientUser.model.js';
+import { getCpUserModel } from '../models/cpUser.model.js';
 import { getBulkUploadModel } from '../models/bulkUpload.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import mongoose from 'mongoose';
@@ -248,7 +249,17 @@ export class LeadService {
             if (filters.campaign) {
                 query['acquired.campaign'] = { $regex: filters.campaign, $options: 'i' };
             }
-            if (filters.status && filters.status !== 'undefined') {
+            if (filters.sub_source) {
+                query['acquired.sub_source'] = { $regex: filters.sub_source, $options: 'i' };
+            }
+            if (filters.project) {
+                // Support both legacy project array and new interested_projects structure
+                query.$or = [
+                    { project: { $regex: filters.project, $options: 'i' } },
+                    { 'interested_projects.project_name': { $regex: filters.project, $options: 'i' } }
+                ];
+            }
+            if (filters.status && filters.status !== 'undefined' && filters.status !== 'all') {
                 if (filters.status === 'No Activity') {
                     query['status'] = { $in: ['No Activity', 'Untouched'] };
                 } else {
@@ -290,6 +301,54 @@ export class LeadService {
                     endOfDay.setHours(23, 59, 59, 999);
                     query['acquired.received'] = { $gte: startOfDay, $lte: endOfDay };
                 }
+            }
+            // Date range support for mobile
+            if ((filters.date_start || filters.date_end) && (!filters.receivedOn)) {
+                query['acquired.received'] = {};
+                if (filters.date_start) {
+                    const start = new Date(filters.date_start);
+                    start.setHours(0, 0, 0, 0);
+                    query['acquired.received'].$gte = start;
+                }
+                if (filters.date_end) {
+                    const end = new Date(filters.date_end);
+                    end.setHours(23, 59, 59, 999);
+                    query['acquired.received'].$lte = end;
+                }
+                if (Object.keys(query['acquired.received']).length === 0) {
+                    delete query['acquired.received'];
+                }
+            }
+
+            // Role-based filtering
+            const email = user?.email || user?.profile?.email;
+            
+            if (role === 'cp' || role === 'cp_user' || role === 'channel_partner') {
+                if (email) {
+                    const CpUser = getCpUserModel(orgConn);
+                    const orgUser = await CpUser.findOne({ "profile.email": email }).select('_id').lean();
+                    if (orgUser) {
+                        const cpId = orgUser._id.toString();
+                        // Support both assignment fields for CP users
+                        query.$or = [
+                            { cp_user: cpId },
+                            { exe_user: cpId }
+                        ];
+                    } else {
+                        // If CP user not found in this org, return empty list
+                        query['cp_user'] = '00000000-0000-0000-0000-000000000000';
+                    }
+                }
+            } else if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
+                // For admin/manager/exec, if assignedTo is provided, check both exe_user and cp_user
+                query.$or = [
+                    { exe_user: filters.assignedTo },
+                    { cp_user: filters.assignedTo }
+                ];
+            }
+
+            if (filters.cp_user) {
+                query['cp_user'] = filters.cp_user;
             }
 
             // Sanitize pagination params
@@ -360,6 +419,7 @@ export class LeadService {
                     sub_source: lead.acquired?.[0]?.sub_source || '',
                     received: receivedStr,
                     exe_user: lead.exe_user ? lead.exe_user.toString() : '',
+                    cp_user: lead.cp_user ? lead.cp_user.toString() : '',
                 };
             });
 
@@ -421,10 +481,23 @@ export class LeadService {
             if (user && !canShowAllPhones && lead.exe_user && !isForcedMasking) {
                 const email = user.email || user.profile?.email;
                 if (email) {
+                    // Try to resolve user ID in this org (works for both ClientUser and CpUser since we find by email)
                     const ClientUser = getClientUserModel(orgConn);
-                    const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
-                    if (orgUser && orgUser._id.toString() === lead.exe_user.toString()) {
-                        isAssignedToMe = true;
+                    const CpUser = getCpUserModel(orgConn);
+                    
+                    const [clientUser, cpUser] = await Promise.all([
+                        ClientUser.findOne({ "profile.email": email }).select('_id').lean(),
+                        CpUser.findOne({ "profile.email": email }).select('_id').lean()
+                    ]);
+                    
+                    const currentOrgUserId = clientUser?._id?.toString() || cpUser?._id?.toString();
+                    
+                    if (currentOrgUserId) {
+                        if (lead.exe_user && lead.exe_user.toString() === currentOrgUserId) {
+                            isAssignedToMe = true;
+                        } else if (lead.cp_user && lead.cp_user.toString() === currentOrgUserId) {
+                            isAssignedToMe = true;
+                        }
                     }
                 }
             }
@@ -438,16 +511,53 @@ export class LeadService {
             let exe_user_image = '';
             if (lead.exe_user) {
                 const ClientUser = getClientUserModel(orgConn);
-                const exeUser = await ClientUser.findById(lead.exe_user).select('profile').lean();
+                
+                // Try finding by UUID first
+                let exeUser;
+                try {
+                    exeUser = await ClientUser.findById(lead.exe_user).select('profile profile_id').lean();
+                } catch (e) {
+                    exeUser = null;
+                }
+
+                // Fallback to finding by profile_id if not found by UUID
+                if (!exeUser) {
+                    const profId = parseInt(lead.exe_user, 10);
+                    if (!isNaN(profId)) {
+                        exeUser = await ClientUser.findOne({ profile_id: profId }).select('profile profile_id').lean();
+                    }
+                }
+
                 if (exeUser) {
                     exe_user_name = `${exeUser.profile?.firstName || ''} ${exeUser.profile?.lastName || ''}`.trim() || 'Unknown';
+                    // Fallback: If ClientUser doesn't have image, check global User
                     exe_user_image = exeUser.profile?.profileImagePath || '';
+                    if (!exe_user_image) {
+                        const { User } = await import('../models/user.model.js');
+                        // Try finding global user by UUID or profile_id
+                        let globalUser;
+                        try {
+                            globalUser = await User.findById(lead.exe_user).select('profile').lean();
+                        } catch (e) {
+                            const pId = parseInt(lead.exe_user, 10);
+                            if (!isNaN(pId)) {
+                                globalUser = await User.findOne({ profile_id: pId }).select('profile').lean();
+                            }
+                        }
+                        if (globalUser?.profile?.profileImagePath) {
+                            exe_user_image = globalUser.profile.profileImagePath;
+                        }
+                    }
                 }
             }
 
             // Fetch activities for this lead
             const { leadActivityService } = await import('./leadActivity.service.js');
-            const activities = await leadActivityService.getActivitiesByLeadId(organization, lead._id.toString());
+            const rawActivities = await leadActivityService.getActivitiesByLeadId(organization, lead._id.toString());
+            const activities = (rawActivities || []).map(a => ({
+                ...(a.toObject ? a.toObject() : a),
+                organization
+            }));
 
             // Count completed site visits
             const site_visits_completed = activities.filter(a => a.updates === 'site_visit' && a.site_visit_completed).length;
@@ -708,7 +818,6 @@ export class LeadService {
             const uploads = await BulkUpload.find({ organization })
                 .sort({ createdAt: -1 })
                 .lean();
-
             return uploads.map(u => ({
                 _id: u._id?.toString() || '',
                 uploadDate: u.createdAt ? new Date(u.createdAt).toISOString() : '',
@@ -726,6 +835,25 @@ export class LeadService {
             }));
         } catch (err) {
             throw new AppError('Failed to fetch bulk uploads: ' + err.message, 500);
+        }
+    }
+
+    async deleteLeadByProfileId(organization, profileId) {
+        if (!organization) throw new AppError('Organization is required', 400);
+        if (!profileId) throw new AppError('Profile ID is required', 400);
+
+        try {
+            const orgConn = await getOrganizationConnection(organization);
+            const Lead = getLeadModel(orgConn);
+
+            const result = await Lead.deleteOne({ profile_id: Number(profileId) });
+            if (result.deletedCount === 0) {
+                throw new AppError('Lead not found', 404);
+            }
+            return { success: true, deletedCount: result.deletedCount };
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            throw new AppError('Failed to delete lead: ' + err.message, 500);
         }
     }
 }

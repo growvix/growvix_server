@@ -206,8 +206,6 @@ export const typeDefs = `#graphql
         isActive: Boolean
     }
 
-
-
     input CreateLeadActivityInput {
         profile_id: Int!
         lead_id: String!
@@ -233,7 +231,6 @@ export const typeDefs = `#graphql
         getProjectById(organization: String!, id: Int!): ProjectSummary
         getLeadStages(organization: String!): LeadStageConfig
         getOrganizationUsers(organization: String!): [OrgUser!]!
-
     }
 
     input UpdateLeadInput {
@@ -256,10 +253,16 @@ export const typeDefs = `#graphql
         facing: [String]
         plot_type: String
     }
- 
+
+    type DeleteLeadResponse {
+        success: Boolean!
+        deletedCount: Int!
+    }
+
     type Mutation {
         createLeadActivity(organization: String!, input: CreateLeadActivityInput!): LeadActivity!
         updateLead(organization: String!, id: String!, input: UpdateLeadInput!): LeadDetail
+        deleteLead(organization: String!, profileId: Int!): DeleteLeadResponse!
         markSiteVisitCompleted(organization: String!, activityId: String!, userId: String!): LeadActivity!
         addRequirement(organization: String!, leadId: String!, key: String!, value: String!): LeadDetail
         removeRequirement(organization: String!, leadId: String!, requirementId: String!): LeadDetail
@@ -267,6 +270,5 @@ export const typeDefs = `#graphql
         addInterestedProject(organization: String!, leadId: String!, projectId: Int!, projectName: String!): LeadDetail
         removeInterestedProject(organization: String!, leadId: String!, projectId: Int!): LeadDetail
         toggleImportantActivity(organization: String!, leadId: String!, activityId: String!, userId: String!): LeadDetail
-
     }
 `;

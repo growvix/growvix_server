@@ -37,7 +37,6 @@ export class UserAvailabilityService {
 
         // Get all active pre-sales users
         const users = await ClientUser.find({
-            department: 'pre-sales',
             isActive: true
         })
             .select('_id profile_id profile.firstName profile.lastName profile.email profile.profileImagePath role department')
@@ -137,7 +136,6 @@ export class UserAvailabilityService {
 
         // Get all active pre-sales users
         const preSalesUsers = await ClientUser.find({
-            department: 'pre-sales',
             isActive: true,
         })
             .sort({ _id: 1 })

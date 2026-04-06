@@ -49,7 +49,7 @@ export const getFormById = async (req, res) => {
         if (form.project_id && form.organization) {
             const orgConn = await getOrganizationConnection(form.organization);
             const Project = getProjectModel(orgConn);
-            const project = await Project.findById(form.project_id).select('name location').lean();
+            const project = await Project.findById(form.project_id).select('name location product_id').lean();
             form.project_id = project || form.project_id;
         }
 
@@ -87,7 +87,7 @@ export const getForms = async (req, res) => {
             
             for (let form of forms) {
                 if (form.project_id) {
-                    const project = await Project.findById(form.project_id).select('name location').lean();
+                    const project = await Project.findById(form.project_id).select('name location product_id').lean();
                     form.project_id = project || form.project_id;
                 }
             }

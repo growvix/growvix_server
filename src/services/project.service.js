@@ -3,6 +3,7 @@ import { getProjectModel } from '../models/project.model.js';
 import { getLeadModel } from '../models/lead.model.js';
 import { getClientUserModel } from '../models/clientUser.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
+import { deleteRemovedImages, deleteUploadedFile } from '../utils/fileCleanup.util.js';
 
 export class ProjectService {
     /**
@@ -454,6 +455,9 @@ export class ProjectService {
                 }
             }
 
+            // Fetch old project to compare images for cleanup
+            const oldProject = await Project.findOne({ product_id: parseInt(productId) }).lean();
+
             const project = await Project.findOneAndUpdate(
                 { product_id: parseInt(productId) },
                 { $set: updateData },
@@ -462,6 +466,65 @@ export class ProjectService {
 
             if (!project) {
                 throw new AppError('Project not found', 404);
+            }
+
+            // ── Clean up removed images from disk ──────────────────────
+            if (oldProject) {
+                try {
+                    // 1. Logo / Brochure
+                    if (updateData.img_location) {
+                        if (oldProject.img_location?.logo && updateData.img_location.logo !== oldProject.img_location.logo) {
+                            deleteUploadedFile(oldProject.img_location.logo);
+                        }
+                        if (oldProject.img_location?.brochure && updateData.img_location.brochure !== oldProject.img_location.brochure) {
+                            deleteUploadedFile(oldProject.img_location.brochure);
+                        }
+                    }
+
+                    // 2. Layout images (plots)
+                    if (updateData.layoutImages) {
+                        deleteRemovedImages(oldProject.layoutImages || [], updateData.layoutImages);
+                    }
+
+                    // 3. Block-level images (floor plans, floor charts, unit plans)
+                    if (updateData.blocks && oldProject.blocks) {
+                        for (const oldBlock of oldProject.blocks) {
+                            const newBlock = updateData.blocks.find(b => b.blockId === oldBlock.blockId);
+
+                            // Block floor plan images
+                            if (newBlock) {
+                                deleteRemovedImages(oldBlock.floorPlanImages || [], newBlock.floorPlanImages || []);
+                            } else {
+                                // Block was removed entirely — delete all its images
+                                (oldBlock.floorPlanImages || []).forEach(url => deleteUploadedFile(url));
+                            }
+
+                            // Floor chart images & unit plan images
+                            for (const oldFloor of (oldBlock.floors || [])) {
+                                const newFloor = newBlock?.floors?.find(f => f.floorNumber === oldFloor.floorNumber);
+
+                                if (newFloor) {
+                                    deleteRemovedImages(oldFloor.floorChartImages || [], newFloor.floorChartImages || []);
+                                } else {
+                                    (oldFloor.floorChartImages || []).forEach(url => deleteUploadedFile(url));
+                                }
+
+                                // Unit plan images
+                                for (const oldUnit of (oldFloor.units || [])) {
+                                    const newUnit = newFloor?.units?.find(u => u.unitId === oldUnit.unitId);
+                                    if (newUnit) {
+                                        deleteRemovedImages(oldUnit.unitPlanImages || [], newUnit.unitPlanImages || []);
+                                    } else {
+                                        (oldUnit.unitPlanImages || []).forEach(url => deleteUploadedFile(url));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (cleanupErr) {
+                    // Never fail the update due to cleanup errors
+                    console.error('[Cleanup] Error during image cleanup:', cleanupErr.message);
+                }
             }
 
             return project;

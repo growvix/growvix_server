@@ -120,8 +120,8 @@ export const resolvers = {
         updatePropertyRequirement: async (_, { organization, leadId, input }) => {
             return await leadService.updatePropertyRequirement(organization, leadId, input);
         },
-        addInterestedProject: async (_, { organization, leadId, projectId, projectName }) => {
-            return await leadService.addInterestedProject(organization, leadId, projectId, projectName);
+        addInterestedProject: async (_, { organization, leadId, projectId }) => {
+            return await leadService.addInterestedProject(organization, leadId, projectId);
         },
         removeInterestedProject: async (_, { organization, leadId, projectId }) => {
             return await leadService.removeInterestedProject(organization, leadId, projectId);

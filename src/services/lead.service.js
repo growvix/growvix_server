@@ -3,6 +3,7 @@ import { getLeadModel } from '../models/lead.model.js';
 import { getClientUserModel } from '../models/clientUser.model.js';
 import { getCpUserModel } from '../models/cpUser.model.js';
 import { getBulkUploadModel } from '../models/bulkUpload.model.js';
+import { getProjectModel } from '../models/project.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
@@ -392,11 +393,21 @@ export class LeadService {
                 query['acquired.sub_source'] = { $regex: filters.sub_source, $options: 'i' };
             }
             if (filters.project) {
+                // Look up matching project IDs by name from the Project collection
+                const Project = getProjectModel(orgConn);
+                const matchingProjects = await Project.find({
+                    name: { $regex: filters.project, $options: 'i' }
+                }).select('product_id').lean();
+                const matchingIds = matchingProjects.map(p => p.product_id);
+
                 // Support both legacy project array and new interested_projects structure
-                query.$or = [
-                    { project: { $regex: filters.project, $options: 'i' } },
-                    { 'interested_projects.project_name': { $regex: filters.project, $options: 'i' } }
+                const projectConditions = [
+                    { project: { $regex: filters.project, $options: 'i' } }
                 ];
+                if (matchingIds.length > 0) {
+                    projectConditions.push({ 'interested_projects.project_id': { $in: matchingIds } });
+                }
+                query.$or = projectConditions;
             }
             if (filters.status && filters.status !== 'undefined' && filters.status !== 'all') {
                 if (filters.status === 'No Activity') {
@@ -733,10 +744,18 @@ export class LeadService {
                     plot_type: lead.requirement.plot_type || '',
                 } : null,
                 project: lead.project || [],
-                interested_projects: (lead.interested_projects || []).map(ip => ({
-                    project_id: ip.project_id,
-                    project_name: ip.project_name,
-                })),
+                interested_projects: await (async () => {
+                    const ips = lead.interested_projects || [];
+                    if (ips.length === 0) return [];
+                    const Project = getProjectModel(orgConn);
+                    const projectIds = ips.map(ip => ip.project_id);
+                    const projects = await Project.find({ product_id: { $in: projectIds } }).select('product_id name').lean();
+                    const projectMap = new Map(projects.map(p => [p.product_id, p.name]));
+                    return ips.map(ip => ({
+                        project_id: ip.project_id,
+                        project_name: projectMap.get(ip.project_id) || `Project #${ip.project_id}`,
+                    }));
+                })(),
                 merge_id: lead.merge_id || [],
                 is_secondary: !!lead.is_secondary,
                 merged_into: lead.merged_into || null,
@@ -869,11 +888,10 @@ export class LeadService {
         }
     }
 
-    async addInterestedProject(organization, leadId, projectId, projectName) {
+    async addInterestedProject(organization, leadId, projectId) {
         if (!organization) throw new AppError('Organization is required', 400);
         if (!leadId) throw new AppError('Lead ID is required', 400);
         if (!projectId) throw new AppError('Project ID is required', 400);
-        if (!projectName) throw new AppError('Project name is required', 400);
         try {
             const orgConn = await getOrganizationConnection(organization);
             const Lead = getLeadModel(orgConn);
@@ -890,7 +908,7 @@ export class LeadService {
 
             await Lead.findByIdAndUpdate(
                 leadId,
-                { $push: { interested_projects: { project_id: projectId, project_name: projectName } } },
+                { $push: { interested_projects: { project_id: projectId } } },
                 { new: true }
             );
             return this.getLeadById(organization, leadId);

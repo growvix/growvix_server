@@ -6,8 +6,7 @@ const SubSourceSchema = new Schema({
     uuid: { type: String, default: () => uuidv4() },
     subSourceName: { type: String, required: true },
     project: {
-        projectId: { type: String },
-        projectName: { type: String }
+        projectId: { type: String }
     }
 }, { _id: false });
 
@@ -27,8 +26,7 @@ const CampaignSchema = new Schema(
         },
         campaignName: { type: String, required: true },
         project: {
-            projectId: { type: String },
-            projectName: { type: String }
+            projectId: { type: String }
         },
         sources: [SourceSchema],
         organization: { type: String, required: true, index: true },

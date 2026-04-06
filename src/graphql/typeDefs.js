@@ -14,6 +14,12 @@ export const typeDefs = `#graphql
         important_activities: [ImportantActivity]
     }
 
+    type MergedLead {
+        UUID: String!
+        id: String!
+        name: String!
+    }
+
     type ImportantActivity {
         activity_id: String!
         marked_at: String
@@ -123,7 +129,7 @@ export const typeDefs = `#graphql
         
         project: [String]
         interested_projects: [InterestedProject]
-        merge_id: [String]
+        merge_id: [MergedLead]
         acquired: [LeadAcquired]
         stage: String
         status: String
@@ -131,6 +137,8 @@ export const typeDefs = `#graphql
         exe_user_name: String
         exe_user_image: String
         number_of_re_engagement: Int
+        is_secondary: Boolean
+        merged_into: MergedLead
         createdAt: String
         updatedAt: String
         site_visits_completed: Int
@@ -222,6 +230,12 @@ export const typeDefs = `#graphql
         follow_up_date: String
     }
 
+    input MergedLeadInput {
+        UUID: String!
+        id: String!
+        name: String!
+    }
+
     type Query {
         getAllLeads(organization: String!): [Lead!]!
         getLeadById(organization: String!, id: String!): LeadDetail
@@ -238,6 +252,9 @@ export const typeDefs = `#graphql
         stage: String
         status: String
         exe_user: String
+        merge_id: [MergedLeadInput]
+        is_secondary: Boolean
+        merged_into: MergedLeadInput
     }
 
     input UpdatePropertyRequirementInput {

@@ -409,7 +409,7 @@ export class LeadService {
             // Apply role-based access control
             let orgUserId = null;
             if (user && !isAdminOrManager) {
-                const email = user.email || user.profile?.email;
+                const email = (user.email || user.profile?.email || '').toLowerCase();
                 if (email) {
                     const ClientUser = getClientUserModel(orgConn);
                     const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
@@ -421,7 +421,7 @@ export class LeadService {
                     query['exe_user'] = orgUserId;
                 } else {
                     // Fallback: if we can't find their org-specific user ID, search for an empty set or just stay safe with a criteria that likely returns nothing for them
-                    query['exe_user'] = 'NOT_FOUND';
+                    query['exe_user'] = '00000000-0000-0000-0000-000000000000';
                 }
             } else if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
                 // If admin/manager, they can filter by assigned user

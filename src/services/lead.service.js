@@ -274,6 +274,9 @@ export class LeadService {
                                 exe_user: lead.exe_user,
                                 project: lead.project || [],
                                 interested_projects: lead.interested_projects || [],
+                                is_secondary: !!lead.is_secondary,
+                                merged_into: lead.merged_into || null,
+                                merge_id: lead.merge_id || [],
                                 requirement: lead.requirement || {},
                                 created_at: new Date(),
                                 updated_at: new Date()
@@ -346,7 +349,38 @@ export class LeadService {
             // Build query from filters
             const query = {};
             if (filters.name) {
-                query['profile.name'] = { $regex: filters.name, $options: 'i' };
+                const searchStr = String(filters.name).trim();
+                const searchRegex = { $regex: searchStr, $options: 'i' };
+                const searchConditions = [
+                    { 'profile.name': searchRegex },
+                    { 'profile.phone': searchRegex },
+                    { 'profile.email': searchRegex }
+                ];
+
+                // Check if it looks like a profile_id search (e.g. "4" or "#4")
+                const idMatch = searchStr.match(/^#?(\d+)$/);
+                if (idMatch) {
+                    searchConditions.push({ profile_id: parseInt(idMatch[1], 10) });
+                }
+
+                // Check if it looks like a UUID
+                if (searchStr.length > 20) {
+                    searchConditions.push({ _id: searchStr });
+                }
+
+                // Handle existing or conditions (merge search with role/visibility restrictions)
+                if (query.$or) {
+                    const existingOr = query.$or;
+                    delete query.$or;
+                    query.$and = [
+                        { $or: existingOr },
+                        { $or: searchConditions }
+                    ];
+                } else if (query.$and) {
+                    query.$and.push({ $or: searchConditions });
+                } else {
+                    query.$or = searchConditions;
+                }
             }
             if (filters.source) {
                 query['acquired.source'] = { $regex: filters.source, $options: 'i' };
@@ -466,10 +500,14 @@ export class LeadService {
                 profile_id: 1,
                 'profile.name': 1,
                 'profile.phone': 1,
+                'profile.email': 1,
                 stage: 1,
                 status: 1,
                 acquired: { $slice: 1 }, // Only need the most recent acquisition for listing
                 exe_user: 1,
+                is_secondary: 1,
+                merged_into: 1,
+                merge_id: 1,
             };
 
             // Run count and paginated query in parallel
@@ -517,6 +555,7 @@ export class LeadService {
                     profile_id: lead.profile_id,
                     name: lead.profile?.name || '',
                     phone: finalPhone,
+                    email: lead.profile?.email || '',
                     stage: lead.stage || '',
                     status: (lead.status === 'Untouched' || lead.status === 'No Activity') ? 'No Activity' : (lead.status || ''),
                     campaign: lead.acquired?.[0]?.campaign || '',
@@ -525,6 +564,9 @@ export class LeadService {
                     received: receivedStr,
                     exe_user: lead.exe_user ? lead.exe_user.toString() : '',
                     cp_user: lead.cp_user ? lead.cp_user.toString() : '',
+                    is_secondary: !!lead.is_secondary,
+                    merged_into: lead.merged_into || null,
+                    merge_id: lead.merge_id || [],
                 };
             });
 
@@ -696,6 +738,8 @@ export class LeadService {
                     project_name: ip.project_name,
                 })),
                 merge_id: lead.merge_id || [],
+                is_secondary: !!lead.is_secondary,
+                merged_into: lead.merged_into || null,
                 number_of_re_engagement: lead.number_of_re_engagement || 0,
                 acquired: transformAcquired(lead.acquired),
                 requirements: (lead.requirements || []).map(r => ({
@@ -733,7 +777,7 @@ export class LeadService {
             const Lead = getLeadModel(orgConn);
 
             // Build update object from allowed fields only
-            const allowedFields = ['stage', 'status', 'exe_user'];
+            const allowedFields = ['stage', 'status', 'exe_user', 'merge_id', 'is_secondary', 'merged_into'];
             const update = {};
             for (const field of allowedFields) {
                 if (updateData[field] !== undefined) {

@@ -35,7 +35,17 @@ const LeadSchema = new Schema(
             project_name: { type: String, required: true }
         }],
         engaged: { type: Object },
-        merge_id: [{ type: String }],
+        is_secondary: { type: Boolean, default: false },
+        merged_into: {
+            UUID: { type: String },
+            id: { type: String },
+            name: { type: String }
+        },
+        merge_id: [{
+            UUID: { type: String, required: true },
+            id: { type: String, required: true },
+            name: { type: String, required: true }
+        }],
         acquired: [{
             campaign: { type: String },
             source: { type: String },

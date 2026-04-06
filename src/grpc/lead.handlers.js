@@ -43,6 +43,7 @@ export async function getAllLeads(req, user) {
                 profile_id: lead.profile_id,
                 name: lead.name || '',
                 phone: lead.phone || '',
+                email: lead.email || '',
                 stage: lead.stage || '',
                 status: lead.status || '',
                 campaign: lead.campaign || '',
@@ -51,6 +52,8 @@ export async function getAllLeads(req, user) {
                 received: lead.received || '',
                 exe_user: lead.exe_user || '',
                 exe_user_name: lead.exe_user ? (userMap[lead.exe_user] || '') : '',
+                is_secondary: !!lead.is_secondary,
+                merged_into: lead.merged_into || null,
             };
         }),
         total,

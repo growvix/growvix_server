@@ -61,7 +61,7 @@ export const uploadFloorPlan = multer({
     storage: storage,
     fileFilter: fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB max file size
+        fileSize: 50 * 1024 * 1024, // 50MB max file size
         files: 5 // Max 5 files at once
     }
 });
@@ -70,7 +70,7 @@ export const uploadProfilePicture = multer({
     storage: profilePictureStorage,
     fileFilter: fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB max file size
+        fileSize: 50 * 1024 * 1024, // 50MB max file size
         files: 1 // Max 1 file
     }
 });

@@ -22,7 +22,7 @@ const UserSchemaDefinition = {
     organization: { type: String, index: true },
     profile: {
         firstName: { type: String, required: true },
-        lastName: { type: String, required: true },
+        lastName: { type: String },
         email: { type: String, required: true, unique: true, index: true },
         phone: { type: String },
         profileImagePath: { type: String },

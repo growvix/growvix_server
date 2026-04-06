@@ -152,7 +152,7 @@ export class ProjectService {
                         location: 1,
                         property: 1,
                         img_location: 1,
-                        createdAt: 1,
+                        createdAt: { $dateToString: { format: "%Y-%m-%dT%H:%M:%S.%LZ", date: "$createdAt" } },
                         blockCount: { $size: { $ifNull: ['$blocks', []] } },
                         plotCount: { $size: { $ifNull: ['$plots', []] } },
                         bookedCount: {

@@ -17,6 +17,7 @@ import dashboardRoutes from './dashboard.routes.js';
 import leadCaptureFormRoutes from './leadCaptureForm.routes.js';
 import attendanceRoutes from './attendance.routes.js';
 import availabilityRoutes from './availability.routes.js';
+import supportTicketRoutes from './supportTicket.routes.js';
 
 
 const router = Router();
@@ -39,5 +40,6 @@ router.use('/google-ads-integration', googleAdIntegrationRoutes);
 router.use('/lead-capture-configs', leadCaptureFormRoutes);
 router.use('/attendance', attendanceRoutes);
 router.use('/availability', availabilityRoutes);
+router.use('/support-tickets', supportTicketRoutes);
 
 export default router;

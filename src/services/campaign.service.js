@@ -1,6 +1,7 @@
 import { getOrganizationConnection } from '../config/multiTenantDb.js';
 import { getCampaignModel } from '../models/campaign.model.js';
 import { getLeadStageModel } from '../models/leadStage.model.js';
+import { getProjectModel } from '../models/project.model.js';
 import { AppError } from '../utils/apiResponse.util.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -14,7 +15,48 @@ export class CampaignService {
         return {
             Campaign: getCampaignModel(orgConn),
             LeadStage: getLeadStageModel(orgConn),
+            Project: getProjectModel(orgConn),
         };
+    }
+
+    /** Resolve project names by looking up project IDs from the Project collection */
+    async _resolveProjectNames(Project, campaigns) {
+        // Collect all unique project IDs from campaigns and sub-sources
+        const projectIds = new Set();
+        for (const camp of campaigns) {
+            if (camp.project?.projectId) projectIds.add(camp.project.projectId);
+            for (const src of (camp.sources || [])) {
+                for (const sub of (src.subSources || [])) {
+                    if (sub.project?.projectId) projectIds.add(sub.project.projectId);
+                }
+            }
+        }
+        if (projectIds.size === 0) return campaigns;
+
+        // Fetch all referenced projects in one query
+        const projects = await Project.find({ product_id: { $in: Array.from(projectIds).map(Number) } }).select('product_id name').lean();
+        const projectMap = new Map(projects.map(p => [String(p.product_id), p.name]));
+
+        // Attach resolved names
+        return campaigns.map(camp => {
+            const obj = camp.toObject ? camp.toObject() : { ...camp };
+            if (obj.project?.projectId) {
+                obj.project.projectName = projectMap.get(String(obj.project.projectId)) || `Project #${obj.project.projectId}`;
+            }
+            if (obj.sources) {
+                obj.sources = obj.sources.map(src => ({
+                    ...src,
+                    subSources: (src.subSources || []).map(sub => ({
+                        ...sub,
+                        project: sub.project?.projectId ? {
+                            ...sub.project,
+                            projectName: projectMap.get(String(sub.project.projectId)) || `Project #${sub.project.projectId}`
+                        } : sub.project
+                    }))
+                }));
+            }
+            return obj;
+        });
     }
 
     /** Apply campaign-level project to every sub-source that doesn't already have one */
@@ -28,8 +70,7 @@ export class CampaignService {
                     subSources: (src.subSources || []).map(sub => ({
                         ...sub,
                         project: {
-                            projectId: campaignProject.projectId,
-                            projectName: campaignProject.projectName
+                            projectId: campaignProject.projectId
                         }
                     }))
                 }));
@@ -64,8 +105,7 @@ export class CampaignService {
 
             if (data.project && data.project.projectId) {
                 campaignData.project = {
-                    projectId: data.project.projectId,
-                    projectName: data.project.projectName
+                    projectId: data.project.projectId
                 };
             }
 
@@ -81,8 +121,9 @@ export class CampaignService {
 
     async getCampaigns(organization) {
         try {
-            const { Campaign } = await this._getModels(organization);
-            return await Campaign.find({ organization }).sort({ createdAt: -1 });
+            const { Campaign, Project } = await this._getModels(organization);
+            const campaigns = await Campaign.find({ organization }).sort({ createdAt: -1 });
+            return await this._resolveProjectNames(Project, campaigns);
         } catch (err) {
             throw new AppError('Failed to fetch campaigns: ' + err.message, 500);
         }
@@ -90,10 +131,11 @@ export class CampaignService {
 
     async getCampaignById(organization, campaignId) {
         try {
-            const { Campaign } = await this._getModels(organization);
+            const { Campaign, Project } = await this._getModels(organization);
             const campaign = await Campaign.findOne({ _id: campaignId, organization });
             if (!campaign) throw new AppError('Campaign not found', 404);
-            return campaign;
+            const [resolved] = await this._resolveProjectNames(Project, [campaign]);
+            return resolved;
         } catch (err) {
             if (err instanceof AppError) throw err;
             throw new AppError('Failed to fetch campaign: ' + err.message, 500);
@@ -194,8 +236,7 @@ export class CampaignService {
             // If campaign has a project, force it on the sub-source
             if (campaign.project && campaign.project.projectId) {
                 newSubSource.project = {
-                    projectId: campaign.project.projectId,
-                    projectName: campaign.project.projectName
+                    projectId: campaign.project.projectId
                 };
             }
 

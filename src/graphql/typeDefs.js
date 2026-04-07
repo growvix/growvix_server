@@ -285,7 +285,7 @@ export const typeDefs = `#graphql
         addRequirement(organization: String!, leadId: String!, key: String!, value: String!): LeadDetail
         removeRequirement(organization: String!, leadId: String!, requirementId: String!): LeadDetail
         updatePropertyRequirement(organization: String!, leadId: String!, input: UpdatePropertyRequirementInput!): LeadDetail
-        addInterestedProject(organization: String!, leadId: String!, projectId: Int!, projectName: String!): LeadDetail
+        addInterestedProject(organization: String!, leadId: String!, projectId: Int!): LeadDetail
         removeInterestedProject(organization: String!, leadId: String!, projectId: Int!): LeadDetail
         toggleImportantActivity(organization: String!, leadId: String!, activityId: String!, userId: String!): LeadDetail
     }

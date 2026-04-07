@@ -31,8 +31,7 @@ const LeadSchema = new Schema(
         }],
         project: [{ type: String }],
         interested_projects: [{
-            project_id: { type: Number, required: true },
-            project_name: { type: String, required: true }
+            project_id: { type: Number, required: true }
         }],
         engaged: { type: Object },
         is_secondary: { type: Boolean, default: false },

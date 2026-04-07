@@ -57,8 +57,11 @@ export class AuthService {
             };
             await ClientUser.create(clientUserData);
         } catch (err) {
-            // Optionally: rollback global user creation or log error
             console.error('Failed to add user to organization DB:', err);
+            try {
+                const fs = await import('fs');
+                fs.appendFileSync('org_error_log.txt', String(err.stack) + '\n');
+            } catch (e) {}
         }
 
         const userObj = user.toObject();

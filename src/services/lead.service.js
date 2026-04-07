@@ -408,11 +408,10 @@ export class LeadService {
 
             // Apply role-based access control
             if (user && !isAdminOrManager) {
-                const email = user.email || user.profile?.email;
+                const email = (user.email || user.profile?.email || '').toLowerCase();
                 const globalId = user._id?.toString();
                 const profileId = user.profile_id?.toString();
                 let orgUserId = null;
-                
                 if (email) {
                     const ClientUser = getClientUserModel(orgConn);
                     const IpCpUser = getCpUserModel(orgConn);
@@ -426,7 +425,11 @@ export class LeadService {
                 }
 
                 // Collect all valid IDs associated with this user (UUIDs and numeric Profile IDs)
-                const userIdentities = [globalId, orgUserId, profileId].filter(id => id && id !== 'undefined');
+                const userIdentities = [globalId, orgUserId, profileId].filter(id => {
+                    if (!id || id === 'undefined') return false;
+                    // Strict UUID format check to avoid casting errors on fields typed as Schema.Types.UUID
+                    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+                });
 
                 if (userIdentities.length > 0) {
                     // Current user only sees leads assigned to them under any of their known IDs

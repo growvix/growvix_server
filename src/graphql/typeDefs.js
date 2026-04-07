@@ -75,7 +75,7 @@ export const typeDefs = `#graphql
 
     type InterestedProject {
         project_id: Int!
-        project_name: String!
+        project_name: String
     }
 
     type ProjectImageLocation {

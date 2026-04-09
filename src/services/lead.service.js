@@ -417,13 +417,11 @@ export class LeadService {
                 }
             }
 
-            // Apply role-based access control
-            if (user && !isAdminOrManager) {
+            let orgUserId = null;
+            if (user) {
                 const email = (user.email || user.profile?.email || '').toLowerCase();
-                const globalId = user._id?.toString();
-                const profileId = user.profile_id?.toString();
-                let orgUserId = null;
                 if (email) {
+                    const orgConn = await getOrganizationConnection(organization);
                     const ClientUser = getClientUserModel(orgConn);
                     const IpCpUser = getCpUserModel(orgConn);
                     
@@ -434,6 +432,12 @@ export class LeadService {
                     
                     orgUserId = cUser?._id?.toString() || cpUser?._id?.toString();
                 }
+            }
+
+            // Apply role-based access control
+            if (user && !isAdminOrManager) {
+                const globalId = user._id?.toString();
+                const profileId = user.profile_id?.toString();
 
                 // Collect all valid IDs associated with this user (UUIDs and numeric Profile IDs)
                 const userIdentities = [globalId, orgUserId, profileId].filter(id => {

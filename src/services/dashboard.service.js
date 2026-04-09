@@ -62,10 +62,16 @@ export class DashboardService {
             missedFollowups,
         ] = await Promise.all([
             Lead.countDocuments({ ...baseQuery }),
-            Lead.countDocuments({ ...baseQuery, stage: { $in: ['new lead', 'New Lead', 'new_lead', 'New'] } }),
-            Lead.countDocuments({ ...baseQuery, stage: { $in: ['reengaged', 'Reengaged', 're-engaged'] } }),
-            Lead.countDocuments({ ...baseQuery, stage: { $in: ['prospect', 'Prospect', 'active prospect'] } }),
-            Lead.countDocuments({ ...baseQuery, stage: { $in: ['missed followup', 'Missed Followup', 'missed_followup'] } }),
+            Lead.countDocuments({ ...baseQuery, stage: { $regex: /new[-\s]*(lead|enquiry|enquir)/i } }),
+            Lead.countDocuments({ 
+                ...baseQuery, 
+                $or: [
+                    { stage: { $regex: /re[-\s]*(engaged|engage|enquiry|enquir|lead)/i } },
+                    { number_of_re_engagement: { $gt: 0 } }
+                ]
+            }),
+            Lead.countDocuments({ ...baseQuery, stage: { $regex: /prospect|interested/i } }),
+            Lead.countDocuments({ ...baseQuery, stage: { $regex: /missed[-\s]?follow/i } }),
         ]);
 
         // Missed calls - check lead activities for missed call entries
@@ -140,12 +146,12 @@ export class DashboardService {
             Lead.countDocuments({
                 ...baseQuery,
                 ...getTimeFilter(),
-                stage: { $in: ['site visit done', 'Site Visit Done', 'sv done', 'Site visit done', 'Site Visit Completed', 'SV Done'] },
+                stage: { $regex: /site[-\s]?visit[-\s]?done|sv[-\s]?done|completed/i },
             }),
             Lead.countDocuments({
                 ...baseQuery,
                 ...getTimeFilter(),
-                stage: { $in: ['booking done', 'Booking Done', 'booked', 'Booked', 'sales done', 'Sales Done', 'converted', 'Booking done'] },
+                stage: { $regex: /booking|booked|sales[-\s]?done|converted/i },
             }),
         ]);
 
@@ -192,13 +198,20 @@ export class DashboardService {
         };
 
         const [newLead, reengaged, lost, siteVisitDone, siteVisitSchedule, prospect, followUps] = await Promise.all([
-            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(true), stage: { $in: ['new lead', 'New Lead', 'new_lead', 'New'] } }),
-            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $in: ['reengaged', 'Reengaged', 're-engaged'] } }),
-            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $in: ['lost', 'Lost', 'dead', 'Lost Lead'] } }),
-            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $in: ['site visit done', 'Site Visit Done', 'sv done', 'Site visit done', 'Site Visit Completed', 'SV Done'] } }),
-            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $in: ['site visit schedule', 'Site Visit Schedule', 'site visit scheduled', 'sv scheduled', 'Site visit schedule', 'SV Scheduled'] } }),
-            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $in: ['prospect', 'Prospect', 'active prospect', 'Active Prospect'] } }),
-            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $in: ['follow up', 'Follow Up', 'follow_up', 'followup', 'Followup', 'Follow-up'] } }),
+            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(true), stage: { $regex: /new[-\s]*(lead|enquiry|enquir)/i } }),
+            Lead.countDocuments({ 
+                ...baseQuery, 
+                ...getTimeFilter(), 
+                $or: [
+                    { stage: { $regex: /re[-\s]*(engaged|engage|enquiry|enquir|lead)/i } },
+                    { number_of_re_engagement: { $gt: 0 } }
+                ]
+            }),
+            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $regex: /lost|dead|not[-\s]*interested/i } }),
+            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $regex: /site[-\s]*visit[-\s]*done|sv[-\s]*done|completed/i } }),
+            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $regex: /site[-\s]*visit[-\s]*sched|sv[-\s]*sched/i } }),
+            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $regex: /prospect|interested/i } }),
+            Lead.countDocuments({ ...baseQuery, ...getTimeFilter(), stage: { $regex: /follow[-\s]*up/i } }),
         ]);
 
         return { newLead, reengaged, lost, siteVisitDone, siteVisitSchedule, prospect, followUps };

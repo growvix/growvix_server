@@ -246,6 +246,7 @@ export const typeDefs = `#graphql
         getProjectById(organization: String!, id: Int!): ProjectSummary
         getLeadStages(organization: String!): LeadStageConfig
         getOrganizationUsers(organization: String!): [OrgUser!]!
+        searchLeadsByName(organization: String!, name: String!): [LeadDetail]
     }
 
     input UpdateLeadInput {

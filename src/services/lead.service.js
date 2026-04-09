@@ -44,7 +44,7 @@ export class LeadService {
                 const query = { organization };
                 const orConditions = [];
                 const normalized = this._normalizePhone(phone);
-                
+
                 if (normalized) {
                     // Match by the last 10 digits as a suffix regex — this is common for Indian mobile numbers
                     orConditions.push({ 'profile.phone': { $regex: normalized + '$' } });
@@ -417,26 +417,51 @@ export class LeadService {
                 }
             }
 
-            // Apply role-based access control
             let orgUserId = null;
-            if (user && !isAdminOrManager) {
+            if (user) {
                 const email = (user.email || user.profile?.email || '').toLowerCase();
                 if (email) {
+                    const orgConn = await getOrganizationConnection(organization);
                     const ClientUser = getClientUserModel(orgConn);
-                    const orgUser = await ClientUser.findOne({ "profile.email": email }).select('_id').lean();
-                    orgUserId = orgUser?._id?.toString();
+                    const IpCpUser = getCpUserModel(orgConn);
+                    
+                    const [cUser, cpUser] = await Promise.all([
+                        ClientUser.findOne({ "profile.email": email }).select('_id').lean(),
+                        IpCpUser.findOne({ "profile.email": email }).select('_id').lean()
+                    ]);
+                    
+                    orgUserId = cUser?._id?.toString() || cpUser?._id?.toString();
                 }
+            }
 
-                // If restricted, only show leads assigned to this user
-                if (orgUserId) {
-                    query['exe_user'] = orgUserId;
+            // Apply role-based access control
+            if (user && !isAdminOrManager) {
+                const globalId = user._id?.toString();
+                const profileId = user.profile_id?.toString();
+
+                // Collect all valid IDs associated with this user (UUIDs and numeric Profile IDs)
+                const userIdentities = [globalId, orgUserId, profileId].filter(id => {
+                    if (!id || id === 'undefined') return false;
+                    // Strict UUID format check to avoid casting errors on fields typed as Schema.Types.UUID
+                    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+                });
+
+                if (userIdentities.length > 0) {
+                    // Current user only sees leads assigned to them under any of their known IDs
+                    query.$or = [
+                        { exe_user: { $in: userIdentities } },
+                        { cp_user: { $in: userIdentities } }
+                    ];
                 } else {
-                    // Fallback: if we can't find their org-specific user ID, search for an empty set or just stay safe with a criteria that likely returns nothing for them
+                    // Use NIL UUID instead of "NOT_FOUND" to prevent backend casting errors
                     query['exe_user'] = '00000000-0000-0000-0000-000000000000';
                 }
             } else if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
-                // If admin/manager, they can filter by assigned user
-                query['exe_user'] = filters.assignedTo;
+                // Admin/Manager filtering by a specific user
+                query.$or = [
+                    { exe_user: filters.assignedTo },
+                    { cp_user: filters.assignedTo }
+                ];
             }
 
             if (filters.stage && filters.stage !== 'undefined') {
@@ -470,32 +495,7 @@ export class LeadService {
                 }
             }
 
-            // Role-based filtering
-            const email = user?.email || user?.profile?.email;
-
-            if (role === 'cp' || role === 'cp_user' || role === 'channel_partner') {
-                if (email) {
-                    const CpUser = getCpUserModel(orgConn);
-                    const orgUser = await CpUser.findOne({ "profile.email": email }).select('_id').lean();
-                    if (orgUser) {
-                        const cpId = orgUser._id.toString();
-                        // Support both assignment fields for CP users
-                        query.$or = [
-                            { cp_user: cpId },
-                            { exe_user: cpId }
-                        ];
-                    } else {
-                        // If CP user not found in this org, return empty list
-                        query['cp_user'] = '00000000-0000-0000-0000-000000000000';
-                    }
-                }
-            } else if (filters.assignedTo && filters.assignedTo !== 'undefined' && filters.assignedTo !== 'all') {
-                // For admin/manager/exec, if assignedTo is provided, check both exe_user and cp_user
-                query.$or = [
-                    { exe_user: filters.assignedTo },
-                    { cp_user: filters.assignedTo }
-                ];
-            }
+            // Role-based filtering handled above by identities
 
             if (filters.cp_user) {
                 query['cp_user'] = filters.cp_user;

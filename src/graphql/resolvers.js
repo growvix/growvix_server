@@ -85,6 +85,29 @@ export const resolvers = {
                 isActive: u.isActive ?? true,
             }));
         },
+        searchLeadsByName: async (_, { organization, name }, context) => {
+            const result = await leadService.getAllLeads(organization, { name }, { user: context.user });
+            // Filter out leads that are already part of any merge relationship
+            // Rule: Don't show secondary leads or leads that are already primary for others
+            const filteredLeads = (result.leads || []).filter(l => {
+                const isSecondary = !!l.is_secondary;
+                const isPrimary = l.merge_id && l.merge_id.length > 0;
+                return !isSecondary && !isPrimary;
+            });
+
+            return filteredLeads.map(l => ({
+                _id: l.lead_id,
+                profile_id: l.profile_id,
+                organization,
+                profile: {
+                    name: l.name,
+                    phone: l.phone,
+                    email: l.email
+                },
+                stage: l.stage,
+                status: l.status
+            }));
+        },
 
     },
     ProjectSummary: {

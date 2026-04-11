@@ -185,6 +185,11 @@ export class UserService {
             }
         }
 
+        // Hash password if provided
+        if (data.password) {
+            data.password = await hashPassword(data.password);
+        }
+
         // Update in global database
         const user = await User.findByIdAndUpdate(id, data, {
             new: true,

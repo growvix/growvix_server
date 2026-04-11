@@ -1,8 +1,22 @@
 import { Router } from 'express';
 import { userController } from '../controllers/user.controller.js';
 import { protect, authorize, authorizePermission } from '../middleware/auth.middleware.js';
+import { decryptPassword } from '../utils/encryption.util.js';
 
 const router = Router();
+
+// Middleware to decrypt encrypted passwords before processing
+const decryptPasswordMiddleware = (req, res, next) => {
+    try {
+        if (req.body.password && req.body.password.length > 100) {
+            req.body.password = decryptPassword(req.body.password);
+        }
+        next();
+    } catch (err) {
+        console.error("Decryption error in user routes:", err);
+        return res.status(400).json({ success: false, message: 'Invalid encrypted password', error: err.message });
+    }
+};
 
 // Protect all routes
 router.use(protect);
@@ -116,7 +130,7 @@ router.get('/:id', authorizePermission('view_users'), userController.getUser);
  *       200:
  *         description: User updated
  */
-router.put('/:id', userController.updateUser);
+router.put('/:id', decryptPasswordMiddleware, userController.updateUser);
 
 /**
  * @swagger

@@ -134,6 +134,20 @@ export class UserController {
 
     res.status(200).json(ApiResponse.success("User deleted"));
 });
+
+    // Update tracking assignment (Admin only)
+    updateTrackingAssignment = asyncHandler(async (req, res) => {
+        const { isTrackingAssigned } = req.body;
+        const user = await userService.updateUser(req.params.id, { isTrackingAssigned });
+        res.status(200).json(ApiResponse.success("Tracking assignment updated", user));
+    });
+
+    // Toggle own tracking status (Mobile user)
+    toggleTrackingStatus = asyncHandler(async (req, res) => {
+        const { isTrackingEnabled } = req.body;
+        const user = await userService.updateUser(req.user._id, { isTrackingEnabled });
+        res.status(200).json(ApiResponse.success("Tracking status updated", user));
+    });
 }
 
 export const userController = new UserController();

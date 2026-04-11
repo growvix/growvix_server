@@ -31,7 +31,7 @@ const UserSchemaDefinition = {
     role: { type: String, enum: ['user', 'admin', 'manager'], default: 'user' },
     department: { type: String, enum: ['pre-sales', 'sales', 'post-sales'], default: 'pre-sales' },
     isActive: { type: Boolean, default: true },
-    teams: [{
+    teams: [{   
         teamId: { type: mongoose.Schema.Types.UUID },
         teamName: { type: String }
     }],

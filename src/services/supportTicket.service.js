@@ -29,7 +29,8 @@ export class SupportTicketService {
                 createdBy: {
                     userId: data.userId,
                     userName: data.userName || ''
-                }
+                },
+                taggedUsers: Array.isArray(data.taggedUsers) ? data.taggedUsers : []
             };
 
             const ticket = await SupportTicket.create(ticketData);
@@ -46,7 +47,10 @@ export class SupportTicketService {
 
             const filter = { organization };
             if (userId) {
-                filter['createdBy.userId'] = userId;
+                filter.$or = [
+                    { 'createdBy.userId': userId },
+                    { 'taggedUsers.userId': userId }
+                ];
             }
 
             const tickets = await SupportTicket.find(filter).sort({ createdAt: -1 });

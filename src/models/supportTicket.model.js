@@ -20,7 +20,11 @@ const SupportTicketSchema = new Schema(
         createdBy: {
             userId: { type: String, required: true },
             userName: { type: String, default: '' }
-        }
+        },
+        taggedUsers: [{
+            userId: { type: String, required: true },
+            userName: { type: String, default: '' }
+        }]
     },
     {
         timestamps: true,
@@ -29,6 +33,7 @@ const SupportTicketSchema = new Schema(
 );
 
 SupportTicketSchema.index({ organization: 1, 'createdBy.userId': 1 });
+SupportTicketSchema.index({ organization: 1, 'taggedUsers.userId': 1 });
 SupportTicketSchema.index({ organization: 1, status: 1 });
 
 export const getSupportTicketModel = (connection) => {

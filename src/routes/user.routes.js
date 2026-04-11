@@ -23,6 +23,10 @@ router.use(protect);
  */
 router.get('/me', userController.getMe);
 
+// Mobile endpoint to toggle user's own tracking enable state
+router.patch('/me/tracking-status', userController.toggleTrackingStatus);
+
+
 /**
  * @swagger
  * /api/users:
@@ -175,5 +179,35 @@ router.delete('/:id', authorizePermission('delete_users'), userController.delete
  *         description: User created successfully
  */
 router.post('/', authorizePermission('add_users'), userController.createUser);
+
+/**
+ * @swagger
+ * /api/users/{id}/tracking:
+ *   patch:
+ *     summary: Update location tracking assignment (admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               isTrackingAssigned:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Tracking assignment updated
+ */
+router.patch('/:id/tracking', authorizePermission('edit_users'), userController.updateTrackingAssignment);
+
+
 
 export default router;

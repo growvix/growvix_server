@@ -12,6 +12,7 @@ import mailRoutes from './mail.routes.js';
 import googleWebhookRoutes from './googleWebhook.routes.js';
 import campaignRoutes from './campaign.routes.js';
 import sourceRoutes from './source.routes.js';
+import locationRoutes from './location.routes.js';
 import googleAdIntegrationRoutes from './googleAdIntegration.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import leadCaptureFormRoutes from './leadCaptureForm.routes.js';
@@ -41,5 +42,6 @@ router.use('/lead-capture-configs', leadCaptureFormRoutes);
 router.use('/attendance', attendanceRoutes);
 router.use('/availability', availabilityRoutes);
 router.use('/support-tickets', supportTicketRoutes);
+router.use('/location', locationRoutes);
 
 export default router;

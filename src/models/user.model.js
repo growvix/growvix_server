@@ -13,8 +13,7 @@ const UserSchema = new Schema(
         },
         profile_id: {
             type: Number,
-            unique: true,
-            index: true
+            unique: true
         },
         globalUserId: {
             type: mongoose.Schema.Types.UUID,
@@ -24,7 +23,7 @@ const UserSchema = new Schema(
         profile: {
             firstName: { type: String, required: true },
             lastName: { type: String },
-            email: { type: String, required: true, unique: true, index: true },
+            email: { type: String, required: true, unique: true },
             phone: { type: String },
             profileImagePath: { type: String },
         },
@@ -37,6 +36,13 @@ const UserSchema = new Schema(
             teamName: { type: String }
         }],
         permissions: [{ type: String }],
+        isTrackingAssigned: { type: Boolean, default: false },
+        isTrackingEnabled: { type: Boolean, default: false },
+        lastKnownLocation: {
+            latitude: { type: Number },
+            longitude: { type: Number },
+            updatedAt: { type: Date }
+        },
     },
     {
         timestamps: true,
